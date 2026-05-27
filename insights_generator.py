@@ -5,7 +5,7 @@ import seaborn as sns
 import streamlit as st
 from typing import Dict, List, Tuple, Optional
 import logging
-from config import call_llm
+from bankruptcy_bsl.config import call_llm
 
 logger = logging.getLogger("insights_generator")
 
@@ -217,16 +217,18 @@ class InsightVisualizer:
         ) -> str:
         """Build a prompt for the LLM summarizing dataset trends and drivers."""
         prompt_lines = [
-            "Role: You are an expert data analyst.Your task is to analyze the following dataset summary and provide a concise, insightful summary of the key trends, patterns, and potential drivers in the data.",
+            "Role: You are an expert data analyst.",
             "Task: Provide a 3-5 liner sharp, practical summary of the dataset's key trends and drivers.",
-            "Focus STRICTLY on what is driving the data and the most important business insights for the end user.",
+            "",
             "Constraints:",
-            "- Strictly NO raw statistics like mean,mode, median,outliers etc.",
+            "- NO raw statistics (mean, median, etc.).",
             "- NO technical jargon, SQL, code, or data quality reports.",
             "- NO generic filler or introductory fluff.",
             "- Format: Use plain English. **Bold** key findings and insights.",
             "- Length: Keep the response to a few concise sentences.",
-          
+            "",
+            "Focus solely on what is driving the data and the most important business insights.",
+            "",
         ]
 
 
