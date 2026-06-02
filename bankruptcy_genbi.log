@@ -3689,3 +3689,1124 @@ pandas.errors.DatabaseError: Execution failed on sql 'DROP TABLE "bankruptcy4"':
 2026-05-06 21:27:03,075 [INFO] config - Bedrock response received | elapsed_ms=1579.73 response_chars=5
 2026-05-06 21:27:03,360 [INFO] bankruptcy3_genbi - Conversation memory appended | query_length=49 | records=11 | total_tokens=4717 | history_length=1
 2026-05-06 21:27:03,360 [INFO] bankruptcy3_genbi - Query execution completed and cached | rows=11 | cache_size=1
+2026-05-27 20:09:24,923 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:09:24,924 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-27 20:09:24,936 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-27 20:09:30,131 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 21
+2026-05-27 20:09:30,137 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:09:30,138 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-27 20:09:35,692 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 21
+2026-05-27 20:09:35,699 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:09:35,700 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-27 20:10:21,129 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 21
+2026-05-27 20:10:21,135 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:10:21,136 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-27 20:10:24,318 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 21
+2026-05-27 20:10:24,323 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:10:24,324 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-27 20:10:34,188 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 21
+2026-05-27 20:10:34,193 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:10:34,193 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-27 20:10:38,086 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 21
+2026-05-27 20:10:38,091 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:10:38,091 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-27 20:15:43,024 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 21
+2026-05-27 20:15:43,028 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:15:43,029 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-27 20:15:43,199 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 21
+2026-05-27 20:15:43,204 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:15:43,204 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-27 20:15:43,218 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-27 20:15:43,219 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-27 20:15:43,219 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=8594
+2026-05-27 20:15:45,436 [ERROR] config - Bedrock call failed: An error occurred (UnrecognizedClientException) when calling the Converse operation: The security token included in the request is invalid.
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\config.py", line 65, in call_llm
+    response = bedrock_client.converse(
+        modelId=bedrock_model,
+    ...<3 lines>...
+        },
+    )
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\botocore\client.py", line 606, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\botocore\context.py", line 123, in wrapper
+    return func(*args, **kwargs)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\botocore\client.py", line 1094, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.exceptions.ClientError: An error occurred (UnrecognizedClientException) when calling the Converse operation: The security token included in the request is invalid.
+2026-05-27 20:15:45,441 [ERROR] bankruptcy_genbi - Error generating SQL from question: Bedrock call failed: An error occurred (UnrecognizedClientException) when calling the Converse operation: The security token included in the request is invalid.
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\config.py", line 65, in call_llm
+    response = bedrock_client.converse(
+        modelId=bedrock_model,
+    ...<3 lines>...
+        },
+    )
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\botocore\client.py", line 606, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\botocore\context.py", line 123, in wrapper
+    return func(*args, **kwargs)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\botocore\client.py", line 1094, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.exceptions.ClientError: An error occurred (UnrecognizedClientException) when calling the Converse operation: The security token included in the request is invalid.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\app.py", line 373, in generate_sql_from_question
+    response = call_llm(prompt)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\config.py", line 92, in call_llm
+    raise RuntimeError(f'Bedrock call failed: {e}')
+RuntimeError: Bedrock call failed: An error occurred (UnrecognizedClientException) when calling the Converse operation: The security token included in the request is invalid.
+2026-05-27 20:15:45,618 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 21
+2026-05-27 20:15:45,623 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-27 20:15:45,623 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 19:54:50,201 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 19:54:50,201 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 19:54:50,210 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 19:54:57,866 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 19:54:57,870 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 19:54:57,870 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 19:55:07,846 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 19:55:07,849 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 19:55:07,850 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 19:55:07,980 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 19:55:07,984 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 19:55:07,985 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 19:55:07,995 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 19:55:07,996 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 19:55:07,997 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=8594
+2026-05-31 19:55:09,966 [INFO] config - Bedrock response received | elapsed_ms=1968.28 response_chars=196
+2026-05-31 19:55:09,968 [INFO] bankruptcy_genbi - SQL generated | length=113 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y
+2026-05-31 19:55:09,971 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=5147
+2026-05-31 19:55:11,198 [INFO] config - Bedrock response received | elapsed_ms=1226.81 response_chars=18
+2026-05-31 19:55:11,200 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 19:55:11,206 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y', Open_date)
+2026-05-31 19:55:11,209 [INFO] bankruptcy_genbi - Executed query successfully | returned 14 rows
+2026-05-31 19:55:11,241 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 19:55:13,127 [INFO] config - Bedrock response received | elapsed_ms=1885.45 response_chars=358
+2026-05-31 19:55:13,138 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 19:55:14,240 [INFO] config - Bedrock response received | elapsed_ms=1101.54 response_chars=5
+2026-05-31 19:55:14,637 [INFO] bankruptcy_genbi - Query processed successfully | rows=14 | chart_type=auto
+2026-05-31 19:55:14,749 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 19:55:14,753 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 19:55:14,754 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 19:55:14,778 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 19:55:16,622 [INFO] config - Bedrock response received | elapsed_ms=1844.32 response_chars=305
+2026-05-31 19:55:16,629 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 19:55:17,716 [INFO] config - Bedrock response received | elapsed_ms=1086.71 response_chars=5
+2026-05-31 19:56:08,339 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 19:56:08,342 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 19:56:08,343 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 19:56:08,400 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 19:56:10,266 [INFO] config - Bedrock response received | elapsed_ms=1866.41 response_chars=434
+2026-05-31 19:56:10,272 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 19:56:11,362 [INFO] config - Bedrock response received | elapsed_ms=1089.28 response_chars=5
+2026-05-31 19:56:11,735 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 19:56:11,739 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 19:56:11,740 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 19:56:11,768 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 19:56:13,633 [INFO] config - Bedrock response received | elapsed_ms=1864.66 response_chars=372
+2026-05-31 19:56:13,644 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 19:56:14,785 [INFO] config - Bedrock response received | elapsed_ms=1140.18 response_chars=5
+2026-05-31 19:56:15,045 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 19:56:15,046 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 19:56:15,047 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=8805
+2026-05-31 19:56:16,689 [INFO] config - Bedrock response received | elapsed_ms=1641.61 response_chars=167
+2026-05-31 19:56:16,721 [INFO] bankruptcy_genbi - SQL generated | length=113 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y
+2026-05-31 19:56:16,725 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=5147
+2026-05-31 19:56:17,885 [INFO] config - Bedrock response received | elapsed_ms=1159.44 response_chars=18
+2026-05-31 19:56:17,890 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 19:56:17,901 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y', Open_date)
+2026-05-31 19:56:17,905 [INFO] bankruptcy_genbi - Executed query successfully | returned 14 rows
+2026-05-31 19:56:17,923 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 19:56:19,823 [INFO] config - Bedrock response received | elapsed_ms=1899.08 response_chars=383
+2026-05-31 19:56:19,833 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 19:56:20,908 [INFO] config - Bedrock response received | elapsed_ms=1073.66 response_chars=5
+2026-05-31 19:56:21,195 [INFO] bankruptcy_genbi - Query processed successfully | rows=14 | chart_type=auto
+2026-05-31 19:56:21,312 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 19:56:21,315 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 19:56:21,316 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 19:56:21,343 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 19:56:23,162 [INFO] config - Bedrock response received | elapsed_ms=1818.23 response_chars=356
+2026-05-31 19:56:23,173 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 19:56:24,311 [INFO] config - Bedrock response received | elapsed_ms=1137.98 response_chars=5
+2026-05-31 19:56:24,591 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 19:56:26,477 [INFO] config - Bedrock response received | elapsed_ms=1884.71 response_chars=383
+2026-05-31 19:56:26,490 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 19:56:27,577 [INFO] config - Bedrock response received | elapsed_ms=1085.73 response_chars=5
+2026-05-31 20:00:12,048 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:00:12,049 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:00:12,053 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 20:00:15,857 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:00:15,860 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:00:15,861 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:00:36,342 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:00:36,351 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:00:36,352 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:00:44,000 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:00:44,004 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:00:44,004 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:04:59,835 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:04:59,837 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:04:59,840 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:04:59,840 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:04:59,848 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 20:05:01,514 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:05:01,519 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:05:01,519 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:05:08,967 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:05:08,970 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:05:08,970 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:05:14,624 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:05:14,628 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:05:14,628 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:05:34,841 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:05:34,844 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:05:34,844 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:05:40,513 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:05:40,516 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:05:40,516 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:05:43,311 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:05:43,314 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:05:43,315 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:05:53,864 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:05:53,870 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:05:53,870 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 20:06:06,323 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 20:06:06,330 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 20:06:06,330 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:05:16,858 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:05:16,859 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:05:16,872 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 21:07:36,873 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:07:36,877 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:07:36,877 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:07:50,581 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:07:50,586 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:07:50,587 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:07:50,728 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:07:50,733 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:07:50,734 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:07:50,746 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 21:07:50,747 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 21:07:50,748 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 21:07:50,749 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=8594
+2026-05-31 21:07:53,090 [INFO] config - Bedrock response received | elapsed_ms=2340.48 response_chars=196
+2026-05-31 21:07:53,095 [INFO] bankruptcy_genbi - SQL generated | length=113 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y
+2026-05-31 21:07:53,101 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 21:07:53,102 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=5147
+2026-05-31 21:07:54,341 [INFO] config - Bedrock response received | elapsed_ms=1237.86 response_chars=18
+2026-05-31 21:07:54,347 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 21:07:54,360 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y', Open_date)
+2026-05-31 21:07:54,394 [INFO] bankruptcy_genbi - Executed query successfully | returned 14 rows
+2026-05-31 21:07:54,425 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:07:56,603 [INFO] config - Bedrock response received | elapsed_ms=2176.82 response_chars=370
+2026-05-31 21:07:56,616 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:07:57,977 [INFO] config - Bedrock response received | elapsed_ms=1360.29 response_chars=5
+2026-05-31 21:07:58,738 [INFO] bankruptcy_genbi - Query processed successfully | rows=14 | chart_type=auto
+2026-05-31 21:07:58,867 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:07:58,871 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:07:58,871 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:07:58,901 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:08:01,070 [INFO] config - Bedrock response received | elapsed_ms=2168.83 response_chars=430
+2026-05-31 21:08:01,084 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:08:02,353 [INFO] config - Bedrock response received | elapsed_ms=1268.24 response_chars=5
+2026-05-31 21:08:08,516 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:08:08,521 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:08:08,522 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:08:08,575 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:08:10,640 [INFO] config - Bedrock response received | elapsed_ms=2064.96 response_chars=375
+2026-05-31 21:08:10,647 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:08:12,067 [INFO] config - Bedrock response received | elapsed_ms=1419.59 response_chars=5
+2026-05-31 21:08:12,774 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:08:12,779 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:08:12,779 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:08:12,815 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:08:14,993 [INFO] config - Bedrock response received | elapsed_ms=2176.96 response_chars=383
+2026-05-31 21:08:15,004 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:08:16,375 [INFO] config - Bedrock response received | elapsed_ms=1369.71 response_chars=5
+2026-05-31 21:08:16,833 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 21:08:16,834 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 21:08:16,835 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 21:08:16,835 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=8805
+2026-05-31 21:08:18,589 [INFO] config - Bedrock response received | elapsed_ms=1752.83 response_chars=167
+2026-05-31 21:08:18,594 [INFO] bankruptcy_genbi - SQL generated | length=113 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y
+2026-05-31 21:08:18,601 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 21:08:18,602 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=5147
+2026-05-31 21:08:20,073 [INFO] config - Bedrock response received | elapsed_ms=1469.56 response_chars=18
+2026-05-31 21:08:20,078 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 21:08:20,090 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y', Open_date)
+2026-05-31 21:08:20,101 [INFO] bankruptcy_genbi - Executed query successfully | returned 14 rows
+2026-05-31 21:08:20,131 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:08:22,671 [INFO] config - Bedrock response received | elapsed_ms=2539.75 response_chars=523
+2026-05-31 21:08:22,683 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:08:24,087 [INFO] config - Bedrock response received | elapsed_ms=1403.67 response_chars=5
+2026-05-31 21:08:24,615 [INFO] bankruptcy_genbi - Query processed successfully | rows=14 | chart_type=auto
+2026-05-31 21:08:24,768 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:08:24,773 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:08:24,773 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:08:24,807 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:08:26,999 [INFO] config - Bedrock response received | elapsed_ms=2192.10 response_chars=383
+2026-05-31 21:08:27,011 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:08:28,424 [INFO] config - Bedrock response received | elapsed_ms=1412.51 response_chars=5
+2026-05-31 21:08:28,896 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:08:30,962 [INFO] config - Bedrock response received | elapsed_ms=2066.24 response_chars=383
+2026-05-31 21:08:30,967 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:08:32,504 [INFO] config - Bedrock response received | elapsed_ms=1535.73 response_chars=5
+2026-05-31 21:14:48,641 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:14:48,646 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:14:48,646 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:14:48,681 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:14:50,788 [INFO] config - Bedrock response received | elapsed_ms=2107.16 response_chars=370
+2026-05-31 21:14:50,800 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:14:52,306 [INFO] config - Bedrock response received | elapsed_ms=1505.48 response_chars=5
+2026-05-31 21:14:52,789 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:14:54,935 [INFO] config - Bedrock response received | elapsed_ms=2145.93 response_chars=394
+2026-05-31 21:14:54,945 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:14:56,246 [INFO] config - Bedrock response received | elapsed_ms=1299.40 response_chars=5
+2026-05-31 21:14:56,800 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:14:56,804 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:14:56,805 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:14:56,838 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:14:59,022 [INFO] config - Bedrock response received | elapsed_ms=2183.56 response_chars=383
+2026-05-31 21:14:59,030 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:15:00,533 [INFO] config - Bedrock response received | elapsed_ms=1501.00 response_chars=5
+2026-05-31 21:15:00,999 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:15:03,065 [INFO] config - Bedrock response received | elapsed_ms=2066.12 response_chars=385
+2026-05-31 21:15:03,076 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:15:04,385 [INFO] config - Bedrock response received | elapsed_ms=1307.90 response_chars=5
+2026-05-31 21:15:04,820 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 21:15:04,821 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 21:15:04,822 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 21:15:04,822 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=8993
+2026-05-31 21:15:06,583 [INFO] config - Bedrock response received | elapsed_ms=1759.99 response_chars=167
+2026-05-31 21:15:06,588 [INFO] bankruptcy_genbi - SQL generated | length=113 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y
+2026-05-31 21:15:06,595 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 21:15:06,596 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=5147
+2026-05-31 21:15:08,000 [INFO] config - Bedrock response received | elapsed_ms=1402.03 response_chars=18
+2026-05-31 21:15:08,003 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 21:15:08,007 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y', Open_date)
+2026-05-31 21:15:08,012 [INFO] bankruptcy_genbi - Executed query successfully | returned 14 rows
+2026-05-31 21:15:08,036 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:15:10,036 [INFO] config - Bedrock response received | elapsed_ms=2000.43 response_chars=350
+2026-05-31 21:15:10,049 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:15:11,380 [INFO] config - Bedrock response received | elapsed_ms=1330.25 response_chars=5
+2026-05-31 21:15:11,833 [INFO] bankruptcy_genbi - Query processed successfully | rows=14 | chart_type=auto
+2026-05-31 21:15:11,975 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 21:15:11,980 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 21:15:11,980 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 21:15:12,019 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:15:13,942 [INFO] config - Bedrock response received | elapsed_ms=1923.25 response_chars=434
+2026-05-31 21:15:13,953 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:15:15,090 [INFO] config - Bedrock response received | elapsed_ms=1135.49 response_chars=5
+2026-05-31 21:15:15,353 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:15:17,019 [INFO] config - Bedrock response received | elapsed_ms=1666.14 response_chars=338
+2026-05-31 21:15:17,023 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:15:18,199 [INFO] config - Bedrock response received | elapsed_ms=1175.82 response_chars=5
+2026-05-31 21:15:18,464 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 21:15:20,403 [INFO] config - Bedrock response received | elapsed_ms=1938.77 response_chars=385
+2026-05-31 21:15:20,407 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 21:15:21,459 [INFO] config - Bedrock response received | elapsed_ms=1051.55 response_chars=5
+2026-05-31 22:23:10,112 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:23:10,113 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:23:10,117 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 22:23:14,072 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:23:14,077 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:23:14,078 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:23:27,667 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:23:27,672 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:23:27,673 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:23:27,844 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:23:27,850 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:23:27,850 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:23:27,865 [INFO] bankruptcy_genbi - Processing user query: how many years are there having count greater than 5
+2026-05-31 22:23:27,867 [INFO] bankruptcy_genbi - Generating SQL from user question: how many years are there having count greater than 5
+2026-05-31 22:23:27,870 [INFO] config - LLM cache miss (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=8d645c2ecc328a2b50a89ded9530b008bacc626a97fbcda9630a7305d4ed3b24 | invoking live call
+2026-05-31 22:23:27,871 [INFO] config - Using AWS Bedrock backend | model=anthropic.claude-3-haiku-20240307-v1:0 prompt_chars=8597
+2026-05-31 22:23:29,860 [INFO] config - Bedrock response received | elapsed_ms=1988.11 response_chars=134
+2026-05-31 22:23:29,919 [INFO] config - LLM response cached successfully (Direct SQLite) | response_chars=134
+2026-05-31 22:23:29,921 [INFO] bankruptcy_genbi - SQL generated | length=122 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+  FROM uploaded_data
+  GROUP BY year
+  
+2026-05-31 22:23:29,933 [INFO] config - LLM cache miss (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=611400f1be34287e5a829fd538fb380cdc57cccfd74657e9050f7da6367a5847 | invoking live call
+2026-05-31 22:23:29,935 [INFO] config - Using AWS Bedrock backend | model=anthropic.claude-3-haiku-20240307-v1:0 prompt_chars=5159
+2026-05-31 22:23:31,330 [INFO] config - Bedrock response received | elapsed_ms=1394.74 response_chars=16
+2026-05-31 22:23:31,388 [INFO] config - LLM response cached successfully (Direct SQLite) | response_chars=16
+2026-05-31 22:23:31,388 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 22:23:31,394 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+  FROM uploaded_data
+  GROUP BY year
+  HAVING COUNT(*) > 5"
+}
+2026-05-31 22:23:31,395 [ERROR] bankruptcy_genbi - Database query execution failed: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+  FROM uploaded_data
+  GROUP BY year
+  HAVING COUNT(*) > 5"
+}': unrecognized token: ""
+}"
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2702, in execute
+    cur.execute(sql, *args)
+    ~~~~~~~~~~~^^^^^^^^^^^^
+sqlite3.OperationalError: unrecognized token: ""
+}"
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\app.py", line 496, in execute_sql_query
+    df = pd.read_sql_query(sql_query, conn)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 497, in read_sql_query
+        return pandas_sql.read_query(
+               ~~~~~~~~~~~~~~~~~~~~~^
+        sql,
+        ^^^^
+    ...<6 lines>...
+        dtype_backend=dtype_backend,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2766, in read_query
+    cursor = self.execute(sql, params)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2714, in execute
+    raise ex from exc
+pandas.errors.DatabaseError: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+  FROM uploaded_data
+  GROUP BY year
+  HAVING COUNT(*) > 5"
+}': unrecognized token: ""
+}"
+2026-05-31 22:23:31,561 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:23:31,566 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:23:31,567 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:23:52,974 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:23:52,978 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:23:52,979 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:23:53,115 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:23:53,120 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:23:53,122 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:23:53,144 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 22:23:53,147 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 22:23:53,152 [INFO] config - LLM cache miss (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=5a1f59886658b2de0c435f9b542ea1d2017c93b800662254b8dfe50c5d1770a1 | invoking live call
+2026-05-31 22:23:53,153 [INFO] config - Using AWS Bedrock backend | model=anthropic.claude-3-haiku-20240307-v1:0 prompt_chars=8673
+2026-05-31 22:23:55,046 [INFO] config - Bedrock response received | elapsed_ms=1891.44 response_chars=128
+2026-05-31 22:23:55,067 [INFO] config - LLM response cached successfully (Direct SQLite) | response_chars=128
+2026-05-31 22:23:55,070 [INFO] bankruptcy_genbi - SQL generated | length=116 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+HAVING
+2026-05-31 22:23:55,088 [INFO] config - LLM cache miss (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=32f2de0de86c99462921546b46d268e1655835c0b869f48ed558a150a41309a2 | invoking live call
+2026-05-31 22:23:55,090 [INFO] config - Using AWS Bedrock backend | model=anthropic.claude-3-haiku-20240307-v1:0 prompt_chars=5150
+2026-05-31 22:23:56,712 [INFO] config - Bedrock response received | elapsed_ms=1620.90 response_chars=16
+2026-05-31 22:23:56,756 [INFO] config - LLM response cached successfully (Direct SQLite) | response_chars=16
+2026-05-31 22:23:56,757 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 22:23:56,764 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+HAVING COUNT(*) > 5"
+}
+2026-05-31 22:23:56,766 [ERROR] bankruptcy_genbi - Database query execution failed: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+HAVING COUNT(*) > 5"
+}': unrecognized token: ""
+}"
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2702, in execute
+    cur.execute(sql, *args)
+    ~~~~~~~~~~~^^^^^^^^^^^^
+sqlite3.OperationalError: unrecognized token: ""
+}"
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\app.py", line 496, in execute_sql_query
+    df = pd.read_sql_query(sql_query, conn)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 497, in read_sql_query
+        return pandas_sql.read_query(
+               ~~~~~~~~~~~~~~~~~~~~~^
+        sql,
+        ^^^^
+    ...<6 lines>...
+        dtype_backend=dtype_backend,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2766, in read_query
+    cursor = self.execute(sql, params)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2714, in execute
+    raise ex from exc
+pandas.errors.DatabaseError: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+HAVING COUNT(*) > 5"
+}': unrecognized token: ""
+}"
+2026-05-31 22:23:56,979 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:23:56,983 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:23:56,984 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:24:13,647 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:24:13,652 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:24:13,654 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:24:13,665 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 22:24:15,823 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:24:15,829 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:24:15,831 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:24:22,835 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:24:22,841 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:24:22,842 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:24:23,022 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:24:23,027 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:24:23,028 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:24:23,038 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 22:24:23,040 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 22:24:23,044 [INFO] config - LLM cache miss (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=66bc30493b9859b690dcea452ed3d2cccf9fb9a775a07e5f384d2f7778615634 | invoking live call
+2026-05-31 22:24:23,045 [INFO] config - Using AWS Bedrock backend | model=anthropic.claude-3-haiku-20240307-v1:0 prompt_chars=8594
+2026-05-31 22:24:26,377 [INFO] config - Bedrock response received | elapsed_ms=3331.31 response_chars=122
+2026-05-31 22:24:26,401 [INFO] config - LLM response cached successfully (Direct SQLite) | response_chars=122
+2026-05-31 22:24:26,404 [INFO] bankruptcy_genbi - SQL generated | length=110 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER 
+2026-05-31 22:24:26,415 [INFO] config - LLM cache miss (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=9ba4e151fcf2b8d5cecaf2b3373b002ece1d3bc313d0d81654cc3aebd1265a14 | invoking live call
+2026-05-31 22:24:26,416 [INFO] config - Using AWS Bedrock backend | model=anthropic.claude-3-haiku-20240307-v1:0 prompt_chars=5144
+2026-05-31 22:24:27,990 [INFO] config - Bedrock response received | elapsed_ms=1573.55 response_chars=16
+2026-05-31 22:24:28,050 [INFO] config - LLM response cached successfully (Direct SQLite) | response_chars=16
+2026-05-31 22:24:28,052 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 22:24:28,058 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}
+2026-05-31 22:24:28,060 [ERROR] bankruptcy_genbi - Database query execution failed: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}': unrecognized token: ""
+}"
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2702, in execute
+    cur.execute(sql, *args)
+    ~~~~~~~~~~~^^^^^^^^^^^^
+sqlite3.OperationalError: unrecognized token: ""
+}"
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\app.py", line 496, in execute_sql_query
+    df = pd.read_sql_query(sql_query, conn)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 497, in read_sql_query
+        return pandas_sql.read_query(
+               ~~~~~~~~~~~~~~~~~~~~~^
+        sql,
+        ^^^^
+    ...<6 lines>...
+        dtype_backend=dtype_backend,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2766, in read_query
+    cursor = self.execute(sql, params)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2714, in execute
+    raise ex from exc
+pandas.errors.DatabaseError: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}': unrecognized token: ""
+}"
+2026-05-31 22:24:28,202 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:24:28,208 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:24:28,208 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:02,097 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:02,101 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:02,102 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:02,110 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 22:25:15,846 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:15,850 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:16,333 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:16,336 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:16,336 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:16,343 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 22:25:17,695 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:17,701 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:17,701 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:24,548 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:24,553 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:24,554 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:24,718 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:24,723 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:24,723 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:24,737 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 22:25:24,740 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 22:25:24,745 [INFO] config - LLM cache hit (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=66bc30493b9859b690dcea452ed3d2cccf9fb9a775a07e5f384d2f7778615634
+2026-05-31 22:25:24,745 [INFO] bankruptcy_genbi - SQL generated | length=110 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER 
+2026-05-31 22:25:24,750 [INFO] config - LLM cache hit (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=9ba4e151fcf2b8d5cecaf2b3373b002ece1d3bc313d0d81654cc3aebd1265a14
+2026-05-31 22:25:24,750 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 22:25:24,755 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}
+2026-05-31 22:25:24,758 [ERROR] bankruptcy_genbi - Database query execution failed: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}': unrecognized token: ""
+}"
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2702, in execute
+    cur.execute(sql, *args)
+    ~~~~~~~~~~~^^^^^^^^^^^^
+sqlite3.OperationalError: unrecognized token: ""
+}"
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\app.py", line 496, in execute_sql_query
+    df = pd.read_sql_query(sql_query, conn)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 497, in read_sql_query
+        return pandas_sql.read_query(
+               ~~~~~~~~~~~~~~~~~~~~~^
+        sql,
+        ^^^^
+    ...<6 lines>...
+        dtype_backend=dtype_backend,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2766, in read_query
+    cursor = self.execute(sql, params)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2714, in execute
+    raise ex from exc
+pandas.errors.DatabaseError: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}': unrecognized token: ""
+}"
+2026-05-31 22:25:24,906 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:24,910 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:24,910 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:46,848 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:46,851 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:46,854 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:46,855 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:46,862 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 22:25:48,710 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:48,718 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:48,719 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:52,958 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:52,964 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:52,964 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:53,136 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:25:53,142 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:25:53,144 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:25:53,154 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 22:25:53,155 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 22:25:53,157 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:25:53,157 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=8594
+2026-05-31 22:25:55,033 [INFO] config - Bedrock response received | elapsed_ms=1874.50 response_chars=196
+2026-05-31 22:25:55,038 [INFO] bankruptcy_genbi - SQL generated | length=113 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y
+2026-05-31 22:25:55,047 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:25:55,048 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=5147
+2026-05-31 22:25:56,450 [INFO] config - Bedrock response received | elapsed_ms=1400.61 response_chars=18
+2026-05-31 22:25:56,456 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 22:25:56,469 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y', Open_date)
+2026-05-31 22:25:56,480 [INFO] bankruptcy_genbi - Executed query successfully | returned 14 rows
+2026-05-31 22:25:56,509 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:25:56,510 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 22:25:58,893 [INFO] config - Bedrock response received | elapsed_ms=2382.46 response_chars=395
+2026-05-31 22:25:58,905 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:25:58,907 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:26:00,228 [INFO] config - Bedrock response received | elapsed_ms=1319.14 response_chars=5
+2026-05-31 22:26:00,758 [INFO] bankruptcy_genbi - Query processed successfully | rows=14 | chart_type=auto
+2026-05-31 22:26:00,891 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:00,896 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:00,897 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:00,938 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:26:00,939 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 22:26:03,319 [INFO] config - Bedrock response received | elapsed_ms=2378.48 response_chars=374
+2026-05-31 22:26:03,327 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:26:03,328 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:26:04,690 [INFO] config - Bedrock response received | elapsed_ms=1359.99 response_chars=5
+2026-05-31 22:26:12,705 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:12,709 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:12,714 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:12,715 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:12,724 [INFO] bankruptcy_genbi - Detected 102 columns from uploaded_data table
+2026-05-31 22:26:14,279 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:14,284 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:14,284 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:16,775 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:16,782 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:16,783 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:16,955 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:16,960 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:16,960 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:16,972 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 22:26:16,974 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 22:26:16,977 [INFO] config - LLM cache hit (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=66bc30493b9859b690dcea452ed3d2cccf9fb9a775a07e5f384d2f7778615634
+2026-05-31 22:26:16,977 [INFO] bankruptcy_genbi - SQL generated | length=110 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER 
+2026-05-31 22:26:16,982 [INFO] config - LLM cache hit (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=9ba4e151fcf2b8d5cecaf2b3373b002ece1d3bc313d0d81654cc3aebd1265a14
+2026-05-31 22:26:16,983 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 22:26:16,987 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}
+2026-05-31 22:26:16,989 [ERROR] bankruptcy_genbi - Database query execution failed: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}': unrecognized token: ""
+}"
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2702, in execute
+    cur.execute(sql, *args)
+    ~~~~~~~~~~~^^^^^^^^^^^^
+sqlite3.OperationalError: unrecognized token: ""
+}"
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\app.py", line 496, in execute_sql_query
+    df = pd.read_sql_query(sql_query, conn)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 497, in read_sql_query
+        return pandas_sql.read_query(
+               ~~~~~~~~~~~~~~~~~~~~~^
+        sql,
+        ^^^^
+    ...<6 lines>...
+        dtype_backend=dtype_backend,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2766, in read_query
+    cursor = self.execute(sql, params)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2714, in execute
+    raise ex from exc
+pandas.errors.DatabaseError: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}': unrecognized token: ""
+}"
+2026-05-31 22:26:17,139 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:17,143 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:17,143 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:20,864 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:20,869 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:20,869 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:21,030 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:21,035 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:21,037 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:21,054 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 22:26:21,055 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 22:26:21,057 [INFO] config - LLM cache miss (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=11f281b248f4f6a2501ba835a2d1b1a9713cc9f751ddcca6dfc708af61576093 | invoking live call
+2026-05-31 22:26:21,057 [INFO] config - Using AWS Bedrock backend | model=anthropic.claude-3-haiku-20240307-v1:0 prompt_chars=8670
+2026-05-31 22:26:22,783 [INFO] config - Bedrock response received | elapsed_ms=1725.11 response_chars=122
+2026-05-31 22:26:22,833 [INFO] config - LLM response cached successfully (Direct SQLite) | response_chars=122
+2026-05-31 22:26:22,836 [INFO] bankruptcy_genbi - SQL generated | length=110 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER 
+2026-05-31 22:26:22,846 [INFO] config - LLM cache hit (Direct SQLite) | model=anthropic.claude-3-haiku-20240307-v1:0 | prompt_hash=9ba4e151fcf2b8d5cecaf2b3373b002ece1d3bc313d0d81654cc3aebd1265a14
+2026-05-31 22:26:22,847 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 22:26:22,850 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}
+2026-05-31 22:26:22,852 [ERROR] bankruptcy_genbi - Database query execution failed: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}': unrecognized token: ""
+}"
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2702, in execute
+    cur.execute(sql, *args)
+    ~~~~~~~~~~~^^^^^^^^^^^^
+sqlite3.OperationalError: unrecognized token: ""
+}"
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\bankruptcy_bsl\app.py", line 496, in execute_sql_query
+    df = pd.read_sql_query(sql_query, conn)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 497, in read_sql_query
+        return pandas_sql.read_query(
+               ~~~~~~~~~~~~~~~~~~~~~^
+        sql,
+        ^^^^
+    ...<6 lines>...
+        dtype_backend=dtype_backend,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2766, in read_query
+    cursor = self.execute(sql, params)
+  File "D:\Birlasoft\bankruptcy\Bankruptcy\Bankruptcy\.venv\Lib\site-packages\pandas\io\sql.py", line 2714, in execute
+    raise ex from exc
+pandas.errors.DatabaseError: Execution failed on sql 'SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count 
+FROM uploaded_data
+GROUP BY year
+ORDER BY year"
+}': unrecognized token: ""
+}"
+2026-05-31 22:26:23,013 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:23,019 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:23,019 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:33,370 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:33,373 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:33,376 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:33,377 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:33,524 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:33,532 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:33,534 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:33,564 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 22:26:33,566 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 22:26:33,567 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:26:33,568 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=8723
+2026-05-31 22:26:35,435 [INFO] config - Bedrock response received | elapsed_ms=1866.89 response_chars=209
+2026-05-31 22:26:35,441 [INFO] bankruptcy_genbi - SQL generated | length=117 | query=SELECT strftime('%Y', Status_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('
+2026-05-31 22:26:35,448 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:26:35,450 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=5151
+2026-05-31 22:26:37,002 [INFO] config - Bedrock response received | elapsed_ms=1550.36 response_chars=18
+2026-05-31 22:26:37,005 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 22:26:37,008 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Status_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y', Status_date)
+2026-05-31 22:26:37,011 [INFO] bankruptcy_genbi - Executed query successfully | returned 6 rows
+2026-05-31 22:26:37,032 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:26:37,037 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=943
+2026-05-31 22:26:39,213 [INFO] config - Bedrock response received | elapsed_ms=2176.25 response_chars=396
+2026-05-31 22:26:39,225 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:26:39,226 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:26:40,547 [INFO] config - Bedrock response received | elapsed_ms=1319.20 response_chars=5
+2026-05-31 22:26:40,886 [INFO] bankruptcy_genbi - Query processed successfully | rows=6 | chart_type=auto
+2026-05-31 22:26:41,014 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:26:41,020 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:26:41,021 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:26:41,069 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:26:41,070 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=943
+2026-05-31 22:26:43,170 [INFO] config - Bedrock response received | elapsed_ms=2099.11 response_chars=347
+2026-05-31 22:26:43,180 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:26:43,182 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:26:44,566 [INFO] config - Bedrock response received | elapsed_ms=1382.89 response_chars=5
+2026-05-31 22:27:07,182 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:27:07,190 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:27:07,190 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:27:18,104 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:27:18,108 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:27:18,109 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:27:25,524 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:27:25,536 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:27:25,537 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:27:35,222 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:27:35,227 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:27:35,227 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:27:35,272 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:27:35,273 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=943
+2026-05-31 22:27:37,360 [INFO] config - Bedrock response received | elapsed_ms=2086.85 response_chars=396
+2026-05-31 22:27:37,373 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:27:37,375 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:27:38,570 [INFO] config - Bedrock response received | elapsed_ms=1192.50 response_chars=5
+2026-05-31 22:27:49,698 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:27:49,701 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:27:49,702 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:27:54,609 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:27:54,613 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:27:54,613 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:27:54,783 [INFO] bankruptcy_genbi - Loaded and cleaned CSV | shape=(110, 103)
+2026-05-31 22:27:54,866 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:27:55,088 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:27:55,094 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:27:55,094 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:27:57,892 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:27:57,899 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:27:57,900 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:27:57,936 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:27:57,937 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=943
+2026-05-31 22:27:59,962 [INFO] config - Bedrock response received | elapsed_ms=2024.77 response_chars=348
+2026-05-31 22:27:59,975 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:27:59,976 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:28:01,391 [INFO] config - Bedrock response received | elapsed_ms=1413.17 response_chars=5
+2026-05-31 22:28:06,137 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:28:06,145 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:28:06,146 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:28:06,176 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:06,177 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=943
+2026-05-31 22:28:08,368 [INFO] config - Bedrock response received | elapsed_ms=2190.22 response_chars=396
+2026-05-31 22:28:08,379 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:08,381 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:28:09,789 [INFO] config - Bedrock response received | elapsed_ms=1406.26 response_chars=5
+2026-05-31 22:28:10,264 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:28:10,269 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:28:10,269 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:28:10,321 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:10,322 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=943
+2026-05-31 22:28:12,552 [INFO] config - Bedrock response received | elapsed_ms=2229.50 response_chars=445
+2026-05-31 22:28:12,564 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:12,566 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:28:13,869 [INFO] config - Bedrock response received | elapsed_ms=1302.02 response_chars=5
+2026-05-31 22:28:14,198 [INFO] bankruptcy_genbi - Processing user query: show me a year wise distribution of notifications
+2026-05-31 22:28:14,200 [INFO] bankruptcy_genbi - Generating SQL from user question: show me a year wise distribution of notifications
+2026-05-31 22:28:14,201 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:14,201 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=9094
+2026-05-31 22:28:16,047 [INFO] config - Bedrock response received | elapsed_ms=1845.75 response_chars=186
+2026-05-31 22:28:16,053 [INFO] bankruptcy_genbi - SQL generated | length=113 | query=SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y
+2026-05-31 22:28:16,060 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:16,062 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=5290
+2026-05-31 22:28:17,480 [INFO] config - Bedrock response received | elapsed_ms=1415.96 response_chars=18
+2026-05-31 22:28:17,485 [INFO] bankruptcy_genbi - SQL Validation Response:
+{"VALID": "YES"}
+2026-05-31 22:28:17,497 [INFO] bankruptcy_genbi - Executing SQLite SQL: SELECT strftime('%Y', Open_date) AS year, COUNT(*) AS count FROM uploaded_data GROUP BY strftime('%Y', Open_date)
+2026-05-31 22:28:17,506 [INFO] bankruptcy_genbi - Executed query successfully | returned 14 rows
+2026-05-31 22:28:17,534 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:17,535 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 22:28:19,707 [INFO] config - Bedrock response received | elapsed_ms=2171.66 response_chars=367
+2026-05-31 22:28:19,714 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:19,715 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:28:21,066 [INFO] config - Bedrock response received | elapsed_ms=1350.72 response_chars=5
+2026-05-31 22:28:21,492 [INFO] bankruptcy_genbi - Query processed successfully | rows=14 | chart_type=auto
+2026-05-31 22:28:21,635 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:28:21,640 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:28:21,641 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:28:21,688 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:21,688 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=943
+2026-05-31 22:28:23,787 [INFO] config - Bedrock response received | elapsed_ms=2098.10 response_chars=361
+2026-05-31 22:28:23,799 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:23,801 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=929
+2026-05-31 22:28:25,238 [INFO] config - Bedrock response received | elapsed_ms=1434.10 response_chars=5
+2026-05-31 22:28:25,589 [WARNING] config - LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching.
+2026-05-31 22:28:25,589 [INFO] config - Using AWS Bedrock backend | model=meta.llama3-8b-instruct-v1:0 prompt_chars=941
+2026-05-31 22:28:26,247 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:28:26,251 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:28:26,252 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:28:27,647 [INFO] config - Bedrock response received | elapsed_ms=2057.60 response_chars=397
+2026-05-31 22:34:03,875 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:34:03,879 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:34:03,886 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:34:03,886 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:34:03,893 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:34:09,909 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:34:09,914 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:34:09,915 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:34:11,441 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:34:11,451 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:34:11,452 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:34:11,935 [ERROR] bankruptcy_genbi - Error in time series source forecast: Execution failed on sql '
+                SELECT client as Source, 
+                       substr(Open_date, 1, 4) as Year, 
+                       COUNT(*) as [Filing Count],
+                       COUNT(*) * 1.0 / SUM(COUNT(*)) OVER (PARTITION BY Year) * 100 as [Market Share %]
+                FROM uploaded_data
+                WHERE Open_date IS NOT NULL AND Open_date != '' AND Open_date LIKE '20%'
+                       AND client IS NOT NULL AND client != ''
+                GROUP BY client, Year
+                ORDER BY Year DESC, [Filing Count] DESC
+                ': no such column: Year
+2026-05-31 22:34:12,323 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:34:12,325 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:34:12,325 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:34:13,930 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:34:13,936 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:34:13,937 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:34:14,305 [ERROR] bankruptcy_genbi - Error in time series source forecast: Execution failed on sql '
+                SELECT client as Source, 
+                       substr(Open_date, 1, 4) as Year, 
+                       COUNT(*) as [Filing Count],
+                       COUNT(*) * 1.0 / SUM(COUNT(*)) OVER (PARTITION BY Year) * 100 as [Market Share %]
+                FROM uploaded_data
+                WHERE Open_date IS NOT NULL AND Open_date != '' AND Open_date LIKE '20%'
+                       AND client IS NOT NULL AND client != ''
+                GROUP BY client, Year
+                ORDER BY Year DESC, [Filing Count] DESC
+                ': no such column: Year
+2026-05-31 22:34:17,342 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:34:17,345 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:34:17,345 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:34:18,842 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:34:18,847 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:34:18,848 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:40:13,845 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:40:13,850 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:40:13,856 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:40:13,856 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:40:13,866 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:40:23,162 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:40:23,170 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:40:23,170 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:40:23,180 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:40:25,184 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:40:25,191 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:40:25,191 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:40:26,247 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:40:26,253 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:40:26,254 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:40:26,620 [ERROR] bankruptcy_genbi - Error in time series source forecast: Execution failed on sql '
+                SELECT client as Source, 
+                       substr(Open_date, 1, 4) as Year, 
+                       COUNT(*) as [Filing Count],
+                       COUNT(*) * 1.0 / SUM(COUNT(*)) OVER (PARTITION BY Year) * 100 as [Market Share %]
+                FROM uploaded_data
+                WHERE Open_date IS NOT NULL AND Open_date != '' AND Open_date LIKE '20%'
+                       AND client IS NOT NULL AND client != ''
+                GROUP BY client, Year
+                ORDER BY Year DESC, [Filing Count] DESC
+                ': no such column: Year
+2026-05-31 22:40:27,553 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:40:27,568 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:40:27,572 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:43:32,097 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:43:32,097 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:43:32,101 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:43:38,069 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:43:38,074 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:43:38,075 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:43:40,880 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:43:40,883 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:43:40,883 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:43:40,887 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:43:55,640 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:43:55,642 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:43:55,642 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:43:55,646 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:43:59,778 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:43:59,784 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:43:59,785 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:44:00,582 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:44:00,586 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:44:00,586 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:45:43,167 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:45:43,169 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:45:43,172 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:45:43,173 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:45:43,178 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:45:47,207 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:45:47,211 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:45:47,211 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:45:55,311 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:45:55,313 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:45:55,313 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:45:55,318 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:47:00,984 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:47:00,986 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:47:00,990 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:47:00,990 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:47:00,995 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:47:04,119 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:47:04,123 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:47:04,123 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:47:52,772 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:47:52,774 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:47:52,778 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:47:52,778 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:47:52,783 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:47:56,516 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:47:56,520 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:47:56,520 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:49:08,515 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:49:08,517 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:49:08,520 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:49:08,520 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:49:08,526 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:49:11,986 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:49:11,990 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:49:11,990 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:49:12,881 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:49:12,884 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:49:12,885 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:49:37,080 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:49:37,083 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:49:37,086 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:49:37,086 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:49:37,093 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:50:01,033 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:50:01,035 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:50:01,039 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:50:01,039 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:50:01,043 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:50:05,678 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:50:05,693 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:50:05,694 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:50:08,053 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:50:08,060 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:50:08,062 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:50:37,016 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:50:37,018 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:50:37,022 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:50:37,022 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:50:37,028 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:50:53,833 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:50:53,834 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:50:53,837 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:50:56,152 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:50:56,158 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:50:56,159 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:50:56,902 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:50:56,908 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:50:56,909 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:51:00,351 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:51:00,356 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:51:00,357 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:51:27,454 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:51:27,456 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:51:27,460 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:51:27,460 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:51:27,465 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:51:53,671 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:51:53,673 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:51:53,676 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:51:53,676 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:51:53,683 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:53:40,788 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:53:40,790 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:53:40,793 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:53:40,793 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:53:40,798 [INFO] bankruptcy_genbi - Detected 103 columns from uploaded_data table
+2026-05-31 22:53:44,712 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:53:44,715 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:53:44,715 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:53:46,986 [WARNING] dotenv.main - python-dotenv could not parse statement starting at line 14
+2026-05-31 22:53:46,998 [INFO] bankruptcy_genbi - Starting Bankruptcy application
+2026-05-31 22:53:46,999 [INFO] bankruptcy_genbi - === Session run initiated ===
+2026-05-31 22:53:47,319 [ERROR] bankruptcy_genbi - Error in time series source forecast: Execution failed on sql '
+                SELECT client as Source, 
+                       substr(Open_date, 1, 4) as Year, 
+                       COUNT(*) as [Filing Count],
+                       COUNT(*) * 1.0 / SUM(COUNT(*)) OVER (PARTITION BY Year) * 100 as [Market Share %]
+                FROM uploaded_data
+                WHERE Open_date IS NOT NULL AND Open_date != '' AND Open_date LIKE '20%'
+                       AND client IS NOT NULL AND client != ''
+                GROUP BY client, Year
+                ORDER BY Year DESC, [Filing Count] DESC
+                ': no such column: Year

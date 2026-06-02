@@ -6,7 +6,7 @@ import re
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-from config import call_llm, call_llm_haiku, call_llm_with_cache
+from config import call_llm, call_llm_haiku
 from dotenv import load_dotenv
 from insights_generator import generate_insights
 
@@ -370,7 +370,7 @@ def generate_sql_from_question(user_question, schema, conversation_memory=None):
             "If the request cannot be represented as a single SQL SELECT query and do not include ';' at the end of the query, return an empty string for `sql`."
         )
 
-        response = call_llm_with_cache(prompt)
+        response = call_llm(prompt)
         sql_query = extract_sql_from_response(response)
         logger.info("SQL generated | length=%d | query=%s", len(sql_query), sql_query[:100] if sql_query else "EMPTY")
         return sql_query
@@ -435,7 +435,7 @@ RESPOND WITH ONLY valid JSON:
 
 Do not include any explanations, text, or additional content outside the JSON object."""
 
-        response = call_llm_with_cache(prompt)
+        response = call_llm(prompt)
         logger.info("SQL Validation Response:\n%s", response)
 
         is_valid = False
@@ -601,9 +601,7 @@ def _append_conversation_memory(user_query, sql_query, records, validation_resul
 # DYNAMIC METRICS & CHARTS RETRIEVER FOR DASHBOARD TABS (CRASH-PROOF FALLBACKS)
 # =============================================================================
 
-def get_dashboard_metrics(state_filter=None, chapter_filter=None, status_filter=None, 
-                        prose_filter=None, asset_filter=None, consumer_type_filter=None,
-                        date_start=None, date_end=None):
+def get_dashboard_metrics():
     """Query dynamic metrics for transactional dashboard tab with robust schema fallbacks"""
     try:
         table_name = get_db_table_name()
@@ -619,27 +617,8 @@ def get_dashboard_metrics(state_filter=None, chapter_filter=None, status_filter=
         cursor.execute(f"PRAGMA table_info({table_name});")
         columns = {row[1] for row in cursor.fetchall()}
 
-        # Build WHERE clause from filters
-        where_clauses = []
-        if state_filter and "State" in columns:
-            where_clauses.append(f"State = '{state_filter}'")
-        if chapter_filter and "chapter" in columns:
-            where_clauses.append(f"chapter = {chapter_filter}")
-        if status_filter and "status" in columns:
-            where_clauses.append(f"status = '{status_filter}'")
-        if prose_filter and "prose_indicator" in columns:
-            where_clauses.append(f"prose_indicator = '{prose_filter}'")
-        if asset_filter and "Asset_indicator" in columns:
-            where_clauses.append(f"Asset_indicator = '{asset_filter}'")
-        if consumer_type_filter and "consumer_type" in columns:
-            where_clauses.append(f"consumer_type = '{consumer_type_filter}'")
-        if date_start and date_end and "Open_date" in columns:
-            where_clauses.append(f"Open_date BETWEEN '{date_start}' AND '{date_end}'")
-        
-        where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
-
         # Total count
-        cursor.execute(f"SELECT COUNT(*) FROM {table_name} WHERE {where_clause}")
+        cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
         total_cases = cursor.fetchone()[0]
 
         # Active cases count
@@ -651,7 +630,7 @@ def get_dashboard_metrics(state_filter=None, chapter_filter=None, status_filter=
             status_col = "Active_Status"
 
         if status_col:
-            cursor.execute(f"SELECT COUNT(*) FROM {table_name} WHERE LOWER({status_col}) IN ('active', 'open', 'y', '1') AND {where_clause}")
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name} WHERE LOWER({status_col}) IN ('active', 'open', 'y', '1')")
             active_cases = cursor.fetchone()[0]
         else:
             active_cases = total_cases
@@ -659,19 +638,19 @@ def get_dashboard_metrics(state_filter=None, chapter_filter=None, status_filter=
         # Converted cases count
         converted_cases = 0
         if "chapter" in columns and "original_chapter" in columns:
-            cursor.execute(f"SELECT COUNT(*) FROM {table_name} WHERE chapter != original_chapter AND original_chapter IS NOT NULL AND original_chapter != '' AND {where_clause}")
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name} WHERE chapter != original_chapter AND original_chapter IS NOT NULL AND original_chapter != ''")
             converted_cases = cursor.fetchone()[0]
 
         # Pro Se cases count
         pro_se_cases = 0
         if "prose_indicator" in columns:
-            cursor.execute(f"SELECT COUNT(*) FROM {table_name} WHERE (prose_indicator = 1 OR LOWER(prose_indicator) IN ('true', '1', 'y')) AND {where_clause}")
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name} WHERE prose_indicator = 1 OR LOWER(prose_indicator) IN ('true', '1', 'y')")
             pro_se_cases = cursor.fetchone()[0]
 
         # Average Match Score
         avg_score = 0.0
         if "match_score" in columns:
-            cursor.execute(f"SELECT AVG(match_score) FROM {table_name} WHERE {where_clause}")
+            cursor.execute(f"SELECT AVG(match_score) FROM {table_name}")
             avg_score = cursor.fetchone()[0] or 0.0
 
         conn.close()
@@ -687,9 +666,7 @@ def get_dashboard_metrics(state_filter=None, chapter_filter=None, status_filter=
         return None
 
 
-def get_chart_data(state_filter=None, chapter_filter=None, status_filter=None, 
-                  prose_filter=None, asset_filter=None, consumer_type_filter=None,
-                  date_start=None, date_end=None):
+def get_chart_data():
     """Query distribution data for dashboard visual widgets with dynamic fallbacks"""
     try:
         table_name = get_db_table_name()
@@ -699,29 +676,10 @@ def get_chart_data(state_filter=None, chapter_filter=None, status_filter=None,
         cursor.execute(f"PRAGMA table_info({table_name});")
         columns = {row[1] for row in cursor.fetchall()}
 
-        # Build WHERE clause from filters
-        where_clauses = []
-        if state_filter and "State" in columns:
-            where_clauses.append(f"State = '{state_filter}'")
-        if chapter_filter and "chapter" in columns:
-            where_clauses.append(f"chapter = {chapter_filter}")
-        if status_filter and "status" in columns:
-            where_clauses.append(f"status = '{status_filter}'")
-        if prose_filter and "prose_indicator" in columns:
-            where_clauses.append(f"prose_indicator = '{prose_filter}'")
-        if asset_filter and "Asset_indicator" in columns:
-            where_clauses.append(f"Asset_indicator = '{asset_filter}'")
-        if consumer_type_filter and "consumer_type" in columns:
-            where_clauses.append(f"consumer_type = '{consumer_type_filter}'")
-        if date_start and date_end and "Open_date" in columns:
-            where_clauses.append(f"Open_date BETWEEN '{date_start}' AND '{date_end}'")
-        
-        base_where = " AND ".join(where_clauses) if where_clauses else "1=1"
-
         df_chapter = pd.DataFrame()
         if "chapter" in columns:
             df_chapter = pd.read_sql_query(
-                f"SELECT chapter as Chapter, COUNT(*) as Count FROM {table_name} WHERE ({base_where}) AND chapter IS NOT NULL AND chapter != '' GROUP BY chapter", conn
+                f"SELECT chapter as Chapter, COUNT(*) as Count FROM {table_name} WHERE chapter IS NOT NULL AND chapter != '' GROUP BY chapter", conn
             )
 
         df_client = pd.DataFrame()
@@ -732,28 +690,32 @@ def get_chart_data(state_filter=None, chapter_filter=None, status_filter=None,
                 break
         if client_col:
             df_client = pd.read_sql_query(
-                f"SELECT {client_col} as [Record Type], COUNT(*) as Count FROM {table_name} WHERE ({base_where}) AND {client_col} IS NOT NULL AND {client_col} != '' GROUP BY {client_col}", conn
+                f"SELECT {client_col} as [Record Type], COUNT(*) as Count FROM {table_name} WHERE {client_col} IS NOT NULL AND {client_col} != '' GROUP BY {client_col}", conn
             )
 
         df_state = pd.DataFrame()
         if "State" in columns:
             df_state = pd.read_sql_query(
-                f"SELECT State, COUNT(*) as Count FROM {table_name} WHERE ({base_where}) AND State IS NOT NULL AND State != '' GROUP BY State ORDER BY Count DESC LIMIT 10", conn
+                f"SELECT State, COUNT(*) as Count FROM {table_name} WHERE State IS NOT NULL AND State != '' GROUP BY State ORDER BY Count DESC LIMIT 10", conn
             )
 
         df_trend = pd.DataFrame()
-        date_col = None
         if "Open_date" in columns:
-            date_col = "Open_date"
-        elif "date_filed" in columns:
-            date_col = "date_filed"
-        
-        if date_col:
             df_trend = pd.read_sql_query(
                 f"""
-                SELECT substr({date_col}, 1, 4) as Year, COUNT(*) as Count
+                SELECT substr(Open_date, 1, 4) as Year, COUNT(*) as Count
                 FROM {table_name}
-                WHERE ({base_where}) AND {date_col} IS NOT NULL AND {date_col} != '' AND {date_col} LIKE '20%'
+                WHERE Open_date IS NOT NULL AND Open_date != '' AND Open_date LIKE '20%'
+                GROUP BY Year
+                ORDER BY Year
+                """, conn
+            )
+        elif "date_filed" in columns:
+            df_trend = pd.read_sql_query(
+                f"""
+                SELECT substr(date_filed, 1, 4) as Year, COUNT(*) as Count
+                FROM {table_name}
+                WHERE date_filed IS NOT NULL AND date_filed != '' AND date_filed LIKE '20%'
                 GROUP BY Year
                 ORDER BY Year
                 """, conn
@@ -766,9 +728,7 @@ def get_chart_data(state_filter=None, chapter_filter=None, status_filter=None,
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 
-def get_case_status_distribution(state_filter=None, chapter_filter=None, status_filter=None, 
-                                prose_filter=None, asset_filter=None, consumer_type_filter=None,
-                                date_start=None, date_end=None):
+def get_case_status_distribution():
     """Get case status distribution for pie chart visualization"""
     try:
         table_name = get_db_table_name()
@@ -777,36 +737,17 @@ def get_case_status_distribution(state_filter=None, chapter_filter=None, status_
         cursor.execute(f"PRAGMA table_info({table_name});")
         columns = {row[1] for row in cursor.fetchall()}
 
-        # Build WHERE clause from filters
-        where_clauses = []
-        if state_filter and "State" in columns:
-            where_clauses.append(f"State = '{state_filter}'")
-        if chapter_filter and "chapter" in columns:
-            where_clauses.append(f"chapter = {chapter_filter}")
-        if status_filter and "status" in columns:
-            where_clauses.append(f"status = '{status_filter}'")
-        if prose_filter and "prose_indicator" in columns:
-            where_clauses.append(f"prose_indicator = '{prose_filter}'")
-        if asset_filter and "Asset_indicator" in columns:
-            where_clauses.append(f"Asset_indicator = '{asset_filter}'")
-        if consumer_type_filter and "consumer_type" in columns:
-            where_clauses.append(f"consumer_type = '{consumer_type_filter}'")
-        if date_start and date_end and "Open_date" in columns:
-            where_clauses.append(f"Open_date BETWEEN '{date_start}' AND '{date_end}'")
-        
-        where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
-
         df_status = pd.DataFrame()
         if "status" in columns:
             df_status = pd.read_sql_query(
-                f"SELECT status as [Status], COUNT(*) as Count FROM {table_name} WHERE status IS NOT NULL AND status != '' AND {where_clause} GROUP BY status ORDER BY Count DESC",
+                f"SELECT status as [Status], COUNT(*) as Count FROM {table_name} WHERE status IS NOT NULL AND status != '' GROUP BY status ORDER BY Count DESC",
                 conn
             )
         else:
             # Fallback: use case disposition or chapter as status proxy
             if "chapter" in columns:
                 df_status = pd.read_sql_query(
-                    f"SELECT chapter as [Status], COUNT(*) as Count FROM {table_name} WHERE chapter IS NOT NULL AND chapter != '' AND {where_clause} GROUP BY chapter ORDER BY Count DESC",
+                    f"SELECT chapter as [Status], COUNT(*) as Count FROM {table_name} WHERE chapter IS NOT NULL AND chapter != '' GROUP BY chapter ORDER BY Count DESC",
                     conn
                 )
         
@@ -821,9 +762,7 @@ def get_case_status_distribution(state_filter=None, chapter_filter=None, status_
 # BANKRUPTCY DATA INTELLIGENCE MODULES (FALLBACK PROTECTION)
 # =============================================================================
 
-def get_advanced_chapter_conversion_insights(state_filter=None, chapter_filter=None, status_filter=None, 
-                                            prose_filter=None, asset_filter=None, consumer_type_filter=None,
-                                            date_start=None, date_end=None):
+def get_advanced_chapter_conversion_insights():
     """Advanced chapter analysis with risk metrics, conversion flows, and distribution insights"""
     try:
         table_name = get_db_table_name()
@@ -832,25 +771,6 @@ def get_advanced_chapter_conversion_insights(state_filter=None, chapter_filter=N
         cursor = conn.cursor()
         cursor.execute(f"PRAGMA table_info({table_name});")
         columns = {row[1] for row in cursor.fetchall()}
-
-        # Build WHERE clause from filters
-        where_clauses = []
-        if state_filter and "State" in columns:
-            where_clauses.append(f"State = '{state_filter}'")
-        if chapter_filter and "chapter" in columns:
-            where_clauses.append(f"chapter = {chapter_filter}")
-        if status_filter and "status" in columns:
-            where_clauses.append(f"status = '{status_filter}'")
-        if prose_filter and "prose_indicator" in columns:
-            where_clauses.append(f"prose_indicator = '{prose_filter}'")
-        if asset_filter and "Asset_indicator" in columns:
-            where_clauses.append(f"Asset_indicator = '{asset_filter}'")
-        if consumer_type_filter and "consumer_type" in columns:
-            where_clauses.append(f"consumer_type = '{consumer_type_filter}'")
-        if date_start and date_end and "Open_date" in columns:
-            where_clauses.append(f"Open_date BETWEEN '{date_start}' AND '{date_end}'")
-        
-        where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
 
         # Chapter distribution with risk metrics
         df_chapter_risk = pd.DataFrame()
@@ -866,7 +786,7 @@ def get_advanced_chapter_conversion_insights(state_filter=None, chapter_filter=N
                         ROUND(MAX(match_score), 1) as [Max Risk],
                         SUM(CASE WHEN match_score >= 80 THEN 1 ELSE 0 END) as [High Risk Cases]
                     FROM {table_name}
-                    WHERE chapter IS NOT NULL AND chapter != '' AND {where_clause}
+                    WHERE chapter IS NOT NULL AND chapter != ''
                     GROUP BY chapter
                     ORDER BY [Total Cases] DESC
                     """, conn
@@ -877,9 +797,9 @@ def get_advanced_chapter_conversion_insights(state_filter=None, chapter_filter=N
                     SELECT 
                         chapter as [Chapter],
                         COUNT(*) as [Total Cases],
-                        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM {table_name} WHERE {where_clause}), 1) as [% of Portfolio]
+                        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM {table_name}), 1) as [% of Portfolio]
                     FROM {table_name}
-                    WHERE chapter IS NOT NULL AND chapter != '' AND {where_clause}
+                    WHERE chapter IS NOT NULL AND chapter != ''
                     GROUP BY chapter
                     ORDER BY [Total Cases] DESC
                     """, conn
@@ -894,9 +814,9 @@ def get_advanced_chapter_conversion_insights(state_filter=None, chapter_filter=N
                     original_chapter as [From], 
                     chapter as [To], 
                     COUNT(*) as [Conversions],
-                    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM {table_name} WHERE original_chapter != chapter AND original_chapter IS NOT NULL AND {where_clause}), 1) as [% of Conversions]
+                    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM {table_name} WHERE original_chapter != chapter AND original_chapter IS NOT NULL), 1) as [% of Conversions]
                 FROM {table_name} 
-                WHERE original_chapter != chapter AND original_chapter IS NOT NULL AND original_chapter != '' AND chapter IS NOT NULL AND chapter != '' AND {where_clause}
+                WHERE original_chapter != chapter AND original_chapter IS NOT NULL AND original_chapter != '' AND chapter IS NOT NULL AND chapter != ''
                 GROUP BY original_chapter, chapter 
                 ORDER BY [Conversions] DESC
                 LIMIT 5
@@ -913,7 +833,7 @@ def get_advanced_chapter_conversion_insights(state_filter=None, chapter_filter=N
                     SUM(CASE WHEN prose_indicator IN ('Y', '1', 'true') THEN 1 ELSE 0 END) as [Pro Se],
                     SUM(CASE WHEN prose_indicator NOT IN ('Y', '1', 'true') THEN 1 ELSE 0 END) as [Represented]
                 FROM {table_name}
-                WHERE chapter IS NOT NULL AND chapter != '' AND {where_clause}
+                WHERE chapter IS NOT NULL AND chapter != ''
                 GROUP BY chapter
                 ORDER BY chapter
                 """, conn
@@ -927,9 +847,7 @@ def get_advanced_chapter_conversion_insights(state_filter=None, chapter_filter=N
 
 
 
-def get_legal_representation_insights(state_filter=None, chapter_filter=None, status_filter=None, 
-                                    prose_filter=None, asset_filter=None, consumer_type_filter=None,
-                                    date_start=None, date_end=None):
+def get_legal_representation_insights():
     """Query representation data, pro se rates, top trustees and attorneys with dynamic check fallbacks"""
     try:
         table_name = get_db_table_name()
@@ -939,25 +857,6 @@ def get_legal_representation_insights(state_filter=None, chapter_filter=None, st
         cursor.execute(f"PRAGMA table_info({table_name});")
         columns = {row[1] for row in cursor.fetchall()}
 
-        # Build WHERE clause from filters
-        where_clauses = []
-        if state_filter and "State" in columns:
-            where_clauses.append(f"State = '{state_filter}'")
-        if chapter_filter and "chapter" in columns:
-            where_clauses.append(f"chapter = {chapter_filter}")
-        if status_filter and "status" in columns:
-            where_clauses.append(f"status = '{status_filter}'")
-        if prose_filter and "prose_indicator" in columns:
-            where_clauses.append(f"prose_indicator = '{prose_filter}'")
-        if asset_filter and "Asset_indicator" in columns:
-            where_clauses.append(f"Asset_indicator = '{asset_filter}'")
-        if consumer_type_filter and "consumer_type" in columns:
-            where_clauses.append(f"consumer_type = '{consumer_type_filter}'")
-        if date_start and date_end and "Open_date" in columns:
-            where_clauses.append(f"Open_date BETWEEN '{date_start}' AND '{date_end}'")
-        
-        where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
-
         df_rep = pd.DataFrame()
         if "prose_indicator" in columns:
             df_rep = pd.read_sql_query(
@@ -965,7 +864,6 @@ def get_legal_representation_insights(state_filter=None, chapter_filter=None, st
                 SELECT CASE WHEN prose_indicator = 1 OR LOWER(prose_indicator) IN ('true', '1', 'y') THEN 'Pro Se (Self-Represented)' ELSE 'Represented by Counsel' END as [Counsel Status],
                        COUNT(*) as [Case Count]
                 FROM {table_name}
-                WHERE {where_clause}
                 GROUP BY [Counsel Status]
                 """, conn
             )
@@ -983,7 +881,7 @@ def get_legal_representation_insights(state_filter=None, chapter_filter=None, st
                 f"""
                 SELECT {name_expr} as [Firm / Attorney Name], COUNT(*) as [Cases Handled]
                 FROM {table_name}
-                WHERE [Firm / Attorney Name] IS NOT NULL AND [Firm / Attorney Name] != '' AND [Firm / Attorney Name] != ' ' AND {where_clause}
+                WHERE [Firm / Attorney Name] IS NOT NULL AND [Firm / Attorney Name] != '' AND [Firm / Attorney Name] != ' '
                 GROUP BY [Firm / Attorney Name]
                 ORDER BY [Cases Handled] DESC
                 LIMIT 10
@@ -996,7 +894,7 @@ def get_legal_representation_insights(state_filter=None, chapter_filter=None, st
                 f"""
                 SELECT trustee_name as [Trustee Name], COUNT(*) as [Cases Administered]
                 FROM {table_name}
-                WHERE trustee_name IS NOT NULL AND trustee_name != '' AND {where_clause}
+                WHERE trustee_name IS NOT NULL AND trustee_name != ''
                 GROUP BY trustee_name
                 ORDER BY [Cases Administered] DESC
                 LIMIT 10
@@ -1009,9 +907,7 @@ def get_legal_representation_insights(state_filter=None, chapter_filter=None, st
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 
-def get_client_insights(state_filter=None, chapter_filter=None, status_filter=None, 
-                       prose_filter=None, asset_filter=None, consumer_type_filter=None,
-                       date_start=None, date_end=None):
+def get_client_insights():
     """Query client distribution, risk profiles, and case volume analytics"""
     try:
         table_name = get_db_table_name()
@@ -1020,25 +916,6 @@ def get_client_insights(state_filter=None, chapter_filter=None, status_filter=No
         cursor = conn.cursor()
         cursor.execute(f"PRAGMA table_info({table_name});")
         columns = {row[1] for row in cursor.fetchall()}
-
-        # Build WHERE clause from filters
-        where_clauses = []
-        if state_filter and "State" in columns:
-            where_clauses.append(f"State = '{state_filter}'")
-        if chapter_filter and "chapter" in columns:
-            where_clauses.append(f"chapter = {chapter_filter}")
-        if status_filter and "status" in columns:
-            where_clauses.append(f"status = '{status_filter}'")
-        if prose_filter and "prose_indicator" in columns:
-            where_clauses.append(f"prose_indicator = '{prose_filter}'")
-        if asset_filter and "Asset_indicator" in columns:
-            where_clauses.append(f"Asset_indicator = '{asset_filter}'")
-        if consumer_type_filter and "consumer_type" in columns:
-            where_clauses.append(f"consumer_type = '{consumer_type_filter}'")
-        if date_start and date_end and "Open_date" in columns:
-            where_clauses.append(f"Open_date BETWEEN '{date_start}' AND '{date_end}'")
-        
-        where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
 
         # Top clients by case count with risk metrics
         df_top_clients = pd.DataFrame()
@@ -1052,7 +929,7 @@ def get_client_insights(state_filter=None, chapter_filter=None, status_filter=No
                         ROUND(AVG(match_score), 1) as [Avg Risk Score],
                         SUM(CASE WHEN match_score >= 80 THEN 1 ELSE 0 END) as [High Risk]
                     FROM {table_name}
-                    WHERE client IS NOT NULL AND client != '' AND client != ' ' AND {where_clause}
+                    WHERE client IS NOT NULL AND client != '' AND client != ' '
                     GROUP BY client
                     ORDER BY [Case Count] DESC
                     LIMIT 8
@@ -1065,7 +942,7 @@ def get_client_insights(state_filter=None, chapter_filter=None, status_filter=No
                         client as [Client],
                         COUNT(*) as [Case Count]
                     FROM {table_name}
-                    WHERE client IS NOT NULL AND client != '' AND client != ' ' AND {where_clause}
+                    WHERE client IS NOT NULL AND client != '' AND client != ' '
                     GROUP BY client
                     ORDER BY [Case Count] DESC
                     LIMIT 8
@@ -1082,7 +959,7 @@ def get_client_insights(state_filter=None, chapter_filter=None, status_filter=No
                     chapter as [Chapter],
                     COUNT(*) as [Cases]
                 FROM {table_name}
-                WHERE client IS NOT NULL AND client != '' AND chapter IS NOT NULL AND {where_clause}
+                WHERE client IS NOT NULL AND client != '' AND chapter IS NOT NULL
                 GROUP BY client, chapter
                 ORDER BY [Cases] DESC
                 LIMIT 10
@@ -1097,9 +974,7 @@ def get_client_insights(state_filter=None, chapter_filter=None, status_filter=No
 
 
 
-def get_asset_and_geo_insights(state_filter=None, chapter_filter=None, status_filter=None, 
-                              prose_filter=None, asset_filter=None, consumer_type_filter=None,
-                              date_start=None, date_end=None):
+def get_asset_and_geo_insights():
     """Query asset indicators and geographical trends with dynamic column check fallbacks"""
     try:
         table_name = get_db_table_name()
@@ -1109,25 +984,6 @@ def get_asset_and_geo_insights(state_filter=None, chapter_filter=None, status_fi
         cursor.execute(f"PRAGMA table_info({table_name});")
         columns = {row[1] for row in cursor.fetchall()}
 
-        # Build WHERE clause from filters
-        where_clauses = []
-        if state_filter and "State" in columns:
-            where_clauses.append(f"State = '{state_filter}'")
-        if chapter_filter and "chapter" in columns:
-            where_clauses.append(f"chapter = {chapter_filter}")
-        if status_filter and "status" in columns:
-            where_clauses.append(f"status = '{status_filter}'")
-        if prose_filter and "prose_indicator" in columns:
-            where_clauses.append(f"prose_indicator = '{prose_filter}'")
-        if asset_filter and "Asset_indicator" in columns:
-            where_clauses.append(f"Asset_indicator = '{asset_filter}'")
-        if consumer_type_filter and "consumer_type" in columns:
-            where_clauses.append(f"consumer_type = '{consumer_type_filter}'")
-        if date_start and date_end and "Open_date" in columns:
-            where_clauses.append(f"Open_date BETWEEN '{date_start}' AND '{date_end}'")
-        
-        where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
-
         df_assets = pd.DataFrame()
         if "Asset_indicator" in columns:
             df_assets = pd.read_sql_query(
@@ -1135,7 +991,6 @@ def get_asset_and_geo_insights(state_filter=None, chapter_filter=None, status_fi
                 SELECT CASE WHEN Asset_indicator = 1 OR LOWER(Asset_indicator) IN ('true', '1', 'y') THEN 'Asset Cases (Assets Present)' ELSE 'No-Asset Cases' END as [Liquidation Type],
                        COUNT(*) as [Case Count]
                 FROM {table_name}
-                WHERE {where_clause}
                 GROUP BY [Liquidation Type]
                 """, conn
             )
@@ -1146,7 +1001,7 @@ def get_asset_and_geo_insights(state_filter=None, chapter_filter=None, status_fi
                 f"""
                 SELECT City || ', ' || State as [Jurisdiction], COUNT(*) as [Filings Density]
                 FROM {table_name}
-                WHERE City IS NOT NULL AND City != '' AND State IS NOT NULL AND State != '' AND {where_clause}
+                WHERE City IS NOT NULL AND City != '' AND State IS NOT NULL AND State != ''
                 GROUP BY [Jurisdiction]
                 ORDER BY [Filings Density] DESC
                 LIMIT 10
@@ -1157,7 +1012,7 @@ def get_asset_and_geo_insights(state_filter=None, chapter_filter=None, status_fi
                 f"""
                 SELECT State as [Jurisdiction], COUNT(*) as [Filings Density]
                 FROM {table_name}
-                WHERE State IS NOT NULL AND State != '' AND {where_clause}
+                WHERE State IS NOT NULL AND State != ''
                 GROUP BY [Jurisdiction]
                 ORDER BY [Filings Density] DESC
                 LIMIT 10
@@ -1217,7 +1072,7 @@ def get_predictive_data():
 
 
 # =============================================================================
-#Forecasting IMPROVEMENTS: TIME SERIES FORECASTING & EARLY WARNINGS
+# PREDICTIVE ANALYSIS IMPROVEMENTS: TIME SERIES FORECASTING & EARLY WARNINGS
 # =============================================================================
 
 def get_timeseries_forecast_channels():
@@ -1387,7 +1242,7 @@ def get_early_warning_alerts(date_range_start=None, date_range_end=None):
 
 
 # =============================================================================
-# ADVANCED DRILL-DOWN & FILTERING FUNCTIONS FORAnalytics
+# ADVANCED DRILL-DOWN & FILTERING FUNCTIONS FOR TRANSACTIONAL ANALYSIS
 # =============================================================================
 
 def get_filtered_cases(state_filter=None, chapter_filter=None, status_filter=None, 
@@ -1595,7 +1450,7 @@ def main():
         )
         selected_tab = st.radio(
             "Select Workspace",
-            ["Data", "Analytics", "Forecasting", "AI Assistant"],
+            [" Data Ingestion", " Transactional Analysis", " Predictive Analysis", " Transactional Chatbot"],
             label_visibility="collapsed"
         )
 
@@ -1608,10 +1463,10 @@ def main():
     # =========================================================================
 
     # -----------------------------------------------------------------
-    # TAB 0:Data (Separated Panel)
+    # TAB 0: DATA INGESTION (Separated Panel)
     # -----------------------------------------------------------------
-    if selected_tab == "Data":
-        st.subheader("Data & Repository Management")
+    if selected_tab == " Data Ingestion":
+        st.subheader(" Data Ingestion & Repository Management")
         st.markdown("Upload transactional files dynamically to populate the SQLite analytics structure.")
 
         uploaded_file = st.file_uploader("Upload CSV database...", type=["csv"], help="Upload bankruptcy CSV data. Columns will be parsed dynamically.")
@@ -1676,9 +1531,9 @@ def main():
             st.info("No active table detected. Please upload a CSV to populate database.")
 
     # -----------------------------------------------------------------
-    # TAB 1:Analytics
+    # TAB 1: TRANSACTIONAL ANALYSIS
     # -----------------------------------------------------------------
-    elif selected_tab == "Analytics":
+    elif selected_tab == " Transactional Analysis":
         st.subheader("Transactional Analytics & Portfolios")
         st.markdown("Dynamic case-profiling intelligence derived from matching scores, jurisdiction networks, and representation distributions.")
 
@@ -1804,16 +1659,7 @@ def main():
                     overview_col1, overview_col2 = st.columns(2)
                     with overview_col1:
                         st.markdown("#### Case Status Distribution")
-                        df_status = get_case_status_distribution(
-                            state_filter=state_filter,
-                            chapter_filter=chapter_filter,
-                            status_filter=status_filter,
-                            prose_filter=prose_filter,
-                            asset_filter=asset_filter,
-                            consumer_type_filter=consumer_filter,
-                            date_start=date_start_str,
-                            date_end=date_end_str
-                        )
+                        df_status = get_case_status_distribution()
                         
                         if df_status is not None and not df_status.empty:
                             # Create pie chart
@@ -1843,16 +1689,7 @@ def main():
                         
                     with overview_col2:
                         st.markdown("#### Filing Rate Trends")
-                        df_chapter_old, df_client, df_state_old, df_trend = get_chart_data(
-                            state_filter=state_filter,
-                            chapter_filter=chapter_filter,
-                            status_filter=status_filter,
-                            prose_filter=prose_filter,
-                            asset_filter=asset_filter,
-                            consumer_type_filter=consumer_filter,
-                            date_start=date_start_str,
-                            date_end=date_end_str
-                        )
+                        df_chapter_old, df_client, df_state_old, df_trend = get_chart_data()
                         if df_trend is not None and not df_trend.empty:
                             df_trend_chart = df_trend.set_index("Year")
                             st.line_chart(df_trend_chart, width="stretch")
@@ -1862,16 +1699,7 @@ def main():
                 # Quadrant 1: Case & Chapter Dynamics
                 with tab_dynamics:
                     st.markdown("### Case Chapter Distributions & Conversions")
-                    df_chapter_risk, df_conversions, df_chapter_demo = get_advanced_chapter_conversion_insights(
-                        state_filter=state_filter,
-                        chapter_filter=chapter_filter,
-                        status_filter=status_filter,
-                        prose_filter=prose_filter,
-                        asset_filter=asset_filter,
-                        consumer_type_filter=consumer_filter,
-                        date_start=date_start_str,
-                        date_end=date_end_str
-                    )
+                    df_chapter_risk, df_conversions, df_chapter_demo = get_advanced_chapter_conversion_insights()
 
                     col_dyn1, col_dyn2 = st.columns([1, 1.2])
                     
@@ -1976,16 +1804,7 @@ def main():
                 # Quadrant 2: Representation & Professional Networks
                 with tab_legal:
                     st.markdown("### Counsel Representation & Judicial Concentrations")
-                    df_rep, df_attorneys, df_trustees = get_legal_representation_insights(
-                        state_filter=state_filter,
-                        chapter_filter=chapter_filter,
-                        status_filter=status_filter,
-                        prose_filter=prose_filter,
-                        asset_filter=asset_filter,
-                        consumer_type_filter=consumer_filter,
-                        date_start=date_start_str,
-                        date_end=date_end_str
-                    )
+                    df_rep, df_attorneys, df_trustees = get_legal_representation_insights()
 
                     col_leg1, col_leg2, col_leg3 = st.columns(3)
 
@@ -2008,16 +1827,7 @@ def main():
                         st.markdown("#### Top Clients by Case Portfolio")
                         st.caption("Leading clients ranked by bankruptcy case count and risk profile")
                         
-                        df_top_clients, df_client_chapter = get_client_insights(
-                            state_filter=state_filter,
-                            chapter_filter=chapter_filter,
-                            status_filter=status_filter,
-                            prose_filter=prose_filter,
-                            asset_filter=asset_filter,
-                            consumer_type_filter=consumer_filter,
-                            date_start=date_start_str,
-                            date_end=date_end_str
-                        )
+                        df_top_clients, df_client_chapter = get_client_insights()
                         
                         if df_top_clients is not None and not df_top_clients.empty:
                             # Create horizontal bar chart with risk scoring
@@ -2053,16 +1863,7 @@ def main():
                 # Quadrant 3: Geographic & Asset Profile Hotspots
                 with tab_assets:
                     st.markdown("### Liquidation Exposure & Geographic Densities")
-                    df_assets, df_geo = get_asset_and_geo_insights(
-                        state_filter=state_filter,
-                        chapter_filter=chapter_filter,
-                        status_filter=status_filter,
-                        prose_filter=prose_filter,
-                        asset_filter=asset_filter,
-                        consumer_type_filter=consumer_filter,
-                        date_start=date_start_str,
-                        date_end=date_end_str
-                    )
+                    df_assets, df_geo = get_asset_and_geo_insights()
 
                     col_asset1, col_asset2 = st.columns(2)
 
@@ -2086,9 +1887,9 @@ def main():
                 st.error("Error reading dashboard intelligence metrics from SQLite.")
 
     # -----------------------------------------------------------------
-    # TAB 2:Forecasting
+    # TAB 2: PREDICTIVE ANALYSIS
     # -----------------------------------------------------------------
-    elif selected_tab == "Forecasting":
+    elif selected_tab == " Predictive Analysis":
         st.subheader(" Predictive Risk & Forecasting")
         st.markdown("Advanced risk scoring, time series forecasting, and early warning detection systems.")
 
@@ -2107,7 +1908,7 @@ def main():
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # New tabs for enhancedForecasting
+                # New tabs for enhanced predictive analysis
                 pred_tab1, pred_tab2, pred_tab3 = st.tabs([
                     " Risk Index Distribution",
                     " Proactive Planning (Time Series)",
@@ -2240,9 +2041,9 @@ def main():
                 st.error("Error retrieving predictive analytics from database.")
 
     # -----------------------------------------------------------------
-    # TAB 3:AI Assistant
+    # TAB 3: TRANSACTIONAL CHATBOT
     # -----------------------------------------------------------------
-    elif selected_tab == "AI Assistant":
+    elif selected_tab == " Transactional Chatbot":
         st.subheader(" AI Transactional Assistant")
         st.markdown("Ask natural language queries about the filings database. The AI will translate it into a safe SQL query, validate it, execute it, and generate visual insights.")
 

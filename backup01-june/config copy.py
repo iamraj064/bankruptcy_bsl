@@ -1,9 +1,6 @@
 import os
 import logging
 import time
-import sqlite3
-import hashlib
-import importlib
 try:
     import boto3
 except ImportError:
@@ -12,24 +9,6 @@ try:
     from openai import OpenAI
 except ImportError:
     OpenAI = None
-try:
-    langchain_litellm = importlib.import_module("langchain_litellm")
-    langchain_globals = importlib.import_module("langchain.globals")
-    langchain_community_cache = importlib.import_module("langchain_community.cache")
-    ChatLiteLLM = getattr(langchain_litellm, "ChatLiteLLM", None)
-    set_llm_cache = getattr(langchain_globals, "set_llm_cache", None)
-    SQLiteCache = getattr(langchain_community_cache, "SQLiteCache", None)
-    LANGCHAIN_AVAILABLE = bool(ChatLiteLLM and set_llm_cache and SQLiteCache)
-except ImportError:
-    ChatLiteLLM = None
-    set_llm_cache = None
-    SQLiteCache = None
-    LANGCHAIN_AVAILABLE = False
-except Exception:
-    ChatLiteLLM = None
-    set_llm_cache = None
-    SQLiteCache = None
-    LANGCHAIN_AVAILABLE = False
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -51,7 +30,7 @@ if not logger.handlers:
 
 def call_llm(
     prompt: str,
-    model: str = 'meta.llama3-8b-instruct-v1:0',
+    model: str = 'gpt-4',
     api_key: str = None,
     timeout: int = 60,
     temperature: float = 0.0,
@@ -136,106 +115,9 @@ def call_llm(
     )
     return text
 
-
-# =============================================================================
-# LANGCHAIN LITELLM CACHING FOR TRANSACTIONAL CHATBOT
-# =============================================================================
-
-_cached_llm = None
-_cache_initialized = False
-
-
-def initialize_llm_cache():
-    """Initialize SQLite-based cache for LLM responses in the Transactional Chatbot."""
-    global _cache_initialized
-
-    if _cache_initialized:
-        return True
-
-    if not LANGCHAIN_AVAILABLE or set_llm_cache is None or SQLiteCache is None:
-        logger.warning(
-            "LangChain LiteLLM caching unavailable. Install langchain, langchain-litellm, and langchain-community to enable caching."
-        )
-        return False
-
-    try:
-        cache_db_path = ".langchain_cache.db"
-        set_llm_cache(SQLiteCache(database_path=cache_db_path))
-        _cache_initialized = True
-        logger.info("LLM caching initialized | database=%s", cache_db_path)
-        return True
-    except Exception as e:
-        logger.exception("Failed to initialize LLM cache: %s", e)
-        return False
-
-
-def get_cached_litellm_instance(model: str = "gpt-4o", temperature: float = 0.0):
-    """Get or create a ChatLiteLLM instance with caching enabled."""
-    global _cached_llm
-
-    if not LANGCHAIN_AVAILABLE or ChatLiteLLM is None:
-        logger.debug("LangChain LiteLLM not available for caching")
-        return None
-
-    try:
-        if _cached_llm is None:
-            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LITELLM_API_KEY")
-            if not api_key:
-                logger.warning("No API key found for LiteLLM caching; set OPENAI_API_KEY or LITELLM_API_KEY")
-                return None
-
-            _cached_llm = ChatLiteLLM(model=model, temperature=temperature, api_key=api_key)
-            logger.info("ChatLiteLLM instance created with caching | model=%s", model)
-
-        return _cached_llm
-    except Exception as e:
-        logger.exception("Error creating ChatLiteLLM instance: %s", e)
-        return None
-
-
-def call_llm_with_cache(prompt: str, model: str = "gpt-4o", temperature: float = 0.0) -> str:
-    """Call LLM with SQLite-based caching using LangChain LiteLLM.
-
-    Identical prompts will return cached responses, avoiding API calls and costs.
-    Cache is persisted in .langchain_cache.db
-    """
-    if not initialize_llm_cache():
-        logger.debug("Cache initialization failed or unavailable, using non-cached call_llm")
-        return call_llm(prompt, model=model, temperature=temperature)
-
-    try:
-        llm = get_cached_litellm_instance(model=model, temperature=temperature)
-        if llm is None:
-            logger.debug("Cached LiteLLM instance unavailable, falling back to call_llm")
-            return call_llm(prompt, model=model, temperature=temperature)
-
-        logger.info("Invoking cached LiteLLM | model=%s | prompt_chars=%d", model, len(prompt))
-        response = llm.invoke(prompt)
-
-        # Extract content from LangChain response object
-        if hasattr(response, "content"):
-            result = response.content
-        else:
-            result = str(response)
-
-        logger.info("Cached LLM response received | response_chars=%d", len(result or ""))
-        return (result or "").strip()
-
-    except Exception as e:
-        logger.exception("Error in cached LLM call, falling back to standard call: %s", e)
-        return call_llm(prompt, model=model, temperature=temperature)
-
-
-# Initialize cache on module load (best-effort)
-if LANGCHAIN_AVAILABLE:
-    try:
-        initialize_llm_cache()
-    except Exception:
-        pass
-
 def call_llm_haiku(
     prompt: str,
-    model: str = 'anthropic.claude-3-haiku-20240307-v1:0',
+    model: str = 'gpt-4',
     api_key: str = None,
     timeout: int = 60,
     temperature: float = 0.1,

@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "boto3>=1.42.90",
+    "langchain>=0.0.500",
+    "langchain-litellm>=0.0.5",
+    "langchain-community>=0.0.15",
     "matplotlib>=3.10.8",
     "ollama>=0.6.1",
     "openai>=2.32.0",

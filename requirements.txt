@@ -3,6 +3,9 @@ traceback2
 pandas
 pypi-json
 openai
+langchain
+langchain-litellm
+langchain-community
 python-dotenv
 matplotlib
 seaborn

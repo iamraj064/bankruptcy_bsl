@@ -6,7 +6,7 @@ import re
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-from config import call_llm, call_llm_haiku, call_llm_with_cache
+from config import call_llm, call_llm_haiku
 from dotenv import load_dotenv
 from insights_generator import generate_insights
 
@@ -370,7 +370,7 @@ def generate_sql_from_question(user_question, schema, conversation_memory=None):
             "If the request cannot be represented as a single SQL SELECT query and do not include ';' at the end of the query, return an empty string for `sql`."
         )
 
-        response = call_llm_with_cache(prompt)
+        response = call_llm(prompt)
         sql_query = extract_sql_from_response(response)
         logger.info("SQL generated | length=%d | query=%s", len(sql_query), sql_query[:100] if sql_query else "EMPTY")
         return sql_query
@@ -435,7 +435,7 @@ RESPOND WITH ONLY valid JSON:
 
 Do not include any explanations, text, or additional content outside the JSON object."""
 
-        response = call_llm_with_cache(prompt)
+        response = call_llm(prompt)
         logger.info("SQL Validation Response:\n%s", response)
 
         is_valid = False
