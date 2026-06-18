@@ -43,9 +43,7 @@ from query_box import (
 )
 
 
-# =============================================================================
-# CONFIG & INITIALIZATION
-# =============================================================================
+
 load_dotenv()
 
 logging.basicConfig(
@@ -1694,6 +1692,30 @@ def main():
                 _fc_status_list = sorted(_fstatus_df["status"].tolist())
             except:
                 _fc_status_list = ["Active", "Closed", "Pending", "Converted", "Dismissed"]
+
+            # Query for date bounds
+            _min_date_val = datetime.date(2020, 1, 1)
+            _max_date_val = datetime.date(2026, 12, 31)
+            try:
+                cur = _fconn.cursor()
+                cur.execute(f"PRAGMA table_info({_ftname})")
+                cols = {r[1] for r in cur.fetchall()}
+                _date_col = "Open_date" if "Open_date" in cols else ("date_filed" if "date_filed" in cols else None)
+                if _date_col:
+                    _df_minmax = pd.read_sql_query(
+                        f"SELECT MIN({_date_col}) as min_d, MAX({_date_col}) as max_d FROM {_ftname} WHERE {_date_col} IS NOT NULL AND {_date_col} != '' AND {_date_col} LIKE '20%'",
+                        _fconn
+                    )
+                    if not _df_minmax.empty:
+                        min_str = _df_minmax["min_d"].iloc[0]
+                        max_str = _df_minmax["max_d"].iloc[0]
+                        if min_str:
+                            _min_date_val = datetime.datetime.strptime(min_str[:10], "%Y-%m-%d").date()
+                        if max_str:
+                            _max_date_val = datetime.datetime.strptime(max_str[:10], "%Y-%m-%d").date()
+            except Exception as e:
+                pass
+
             _fconn.close()
 
             _fc_chapter_sel = st.selectbox("Chapter", ["All"] + _fc_chapter_list, key="fc_chapter")
@@ -1716,6 +1738,22 @@ def main():
             elif _fc_prose_sel == "Represented by Counsel":
                 _fc_prose_val = "0"
 
+            # Date range filter widget
+            _fc_date_range = st.date_input(
+                "Historical Date Range",
+                value=(_min_date_val, _max_date_val),
+                min_value=_min_date_val,
+                max_value=_max_date_val,
+                key="fc_date_range"
+            )
+            _fc_start_date = _min_date_val
+            _fc_end_date = _max_date_val
+            if isinstance(_fc_date_range, (tuple, list)) and len(_fc_date_range) == 2:
+                _fc_start_date, _fc_end_date = _fc_date_range
+            elif isinstance(_fc_date_range, (tuple, list)) and len(_fc_date_range) == 1:
+                _fc_start_date = _fc_date_range[0]
+                _fc_end_date = _max_date_val
+
             _fc_horizon_val = st.slider(" Forecast Horizon (months)", 6, 24, 12, key="fc_horizon")
 
             # Store in session state for use in the main body
@@ -1725,6 +1763,8 @@ def main():
                 "status_val": _fc_status_val,
                 "prose_val": _fc_prose_val,
                 "horizon": _fc_horizon_val,
+                "start_date": _fc_start_date,
+                "end_date": _fc_end_date,
             }
 
     # st.markdown('<div class="main-title"> Bankruptcy GenBI Assistant</div>', unsafe_allow_html=True)
@@ -2400,16 +2440,20 @@ def main():
             fc_status_val  = _ff.get("status_val")
             fc_prose_val   = _ff.get("prose_val")
             fc_horizon     = _ff.get("horizon", 12)
+            fc_start_date  = _ff.get("start_date")
+            fc_end_date    = _ff.get("end_date")
 
             #  Run models 
             @st.cache_data(ttl=120, show_spinner=False)
-            def _fc(ch, st_val, stat_val, pr_val, h):
+            def _fc(ch, st_val, stat_val, pr_val, h, start_d, end_d):
                 df_s = load_monthly_series(
                     chapter_filter=ch,
                     state_filter=st_val,
                     status_filter=stat_val,
                     prose_filter=pr_val,
                     client_filter=None,
+                    start_date=start_d,
+                    end_date=end_d,
                 )
                 return run_filing_forecast(df_s, horizon_months=h), df_s
 
@@ -2420,20 +2464,21 @@ def main():
                     fc_status_val,
                     fc_prose_val,
                     fc_horizon,
+                    fc_start_date,
+                    fc_end_date,
                 )
 
             if not fc_result:
-                st.error("Not enough data to forecast. Try broadening your filter selections (e.g., selecting 'All' for Chapter/State/Status/etc.).")
+                st.error("Not enough data to forecast. Try broadening your filter selections (e.g., selecting 'All' for Chapter/State/Status/etc.) or extending the date range.")
             else:
-                #  KPI strip 
                 k1, k2, k3, k4, k5 = st.columns(5)
-                k1.metric("Next 3 Months", f"{fc_result['next_q']:,}")
-                k2.metric("12-Month Projection", f"{fc_result['next_year']:,}")
+                k1.metric("Next 3 Months Filing Count", f"{fc_result['next_q']:,}")
+                k2.metric("12-Month Projection Filing Count", f"{fc_result['next_year']:,}")
                 k3.metric("Trend", fc_result["trend"].title(), f"{fc_result['trend_pct']:+.1f}%")
-                k4.metric("Model MAPE", f"{fc_result['metrics']['MAPE (%)']:.1f}%")
+                _acc = fc_result.get("metrics", {}).get("Accuracy", 0.0)
+                k4.metric("Model Accuracy", f"{_acc:.1f}%")
                 k5.metric("Peak Month", fc_result["peak_month"])
 
-                # Key Business Insights at the top (front)
                 if "insights" in fc_result and fc_result["insights"]:
                     st.markdown(
                         """
@@ -2442,7 +2487,7 @@ def main():
                                     padding: 0.9rem 1.25rem; margin-top: 1rem; margin-bottom: 0.5rem;">
                             <div style="font-size:0.75rem; color:#0369a1; font-weight:700;
                                         letter-spacing:0.07em; text-transform:uppercase;
-                                        margin-bottom:0.5rem;">💡 Key Forecasting Insights</div>
+                                        margin-bottom:0.5rem;"> Key Forecasting Insights</div>
                             <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: #1e293b; line-height: 1.6;">
                         """ + "".join([f"<li style='margin-bottom:0.4rem;'>{ins}</li>" for ins in fc_result["insights"][:4]]) + """
                             </ul>
@@ -2451,42 +2496,201 @@ def main():
                         unsafe_allow_html=True
                     )
 
-                #  Row 1: Ensemble forecast chart (full width) 
-                hist_df  = fc_result["history"]
-                fcast_df = fc_result["forecast"]
+                hist_df   = fc_result["history"]
+                fcast_df  = fc_result["forecast"]
+                fitted_df = fc_result.get("fitted", pd.DataFrame())
 
-                fig_fc = go.Figure()
-                fig_fc.add_trace(go.Scatter(
+                # ── Load the FULL available series (no date filter) so we can overlay
+                #    real observed values on the forecast period for backtesting. ──────
+                @st.cache_data(ttl=120, show_spinner=False)
+                def _load_full_series(ch, st_val, stat_val, pr_val):
+                    return load_monthly_series(
+                        chapter_filter=ch, state_filter=st_val,
+                        status_filter=stat_val, prose_filter=pr_val,
+                        client_filter=None, start_date=None, end_date=None,
+                    )
+
+                df_full = _load_full_series(
+                    fc_chapter_val, fc_state_val, fc_status_val, fc_prose_val
+                )
+
+                # Find actual data that falls inside the forecast window
+                df_actual_in_fcst = pd.DataFrame()
+                if not df_full.empty and not fcast_df.empty and "Filing_Count" in df_full.columns:
+                    fcst_start = fcast_df["Month"].iloc[0]
+                    fcst_end   = fcast_df["Month"].iloc[-1]
+                    df_actual_in_fcst = df_full[
+                        (df_full["Month"] >= fcst_start) &
+                        (df_full["Month"] <= fcst_end)
+                    ][["Month", "Filing_Count"]].copy()
+
+                has_actual_in_fcst = not df_actual_in_fcst.empty
+
+                st.markdown(
+                    f"""
+                    <div style="font-size:0.8rem; font-weight:700; color:#0369a1;
+                                text-transform:uppercase; letter-spacing:0.07em;
+                                margin: 1rem 0 0.3rem 0;">
+                         Actual vs Forecasted — Filing Count
+                        {"&nbsp;<span style='background:#dcfce7; color:#15803d; border-radius:4px; padding:2px 8px; font-size:0.7rem; font-weight:700; vertical-align:middle;'>✔ ACTUAL DATA AVAILABLE IN FORECAST WINDOW</span>" if has_actual_in_fcst else ""}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                fig_avf = go.Figure()
+
+                # ── 1. Actual historical filings (within selected date range) ──────────
+                fig_avf.add_trace(go.Scatter(
                     x=hist_df["Month"], y=hist_df["Filing_Count"],
-                    name="Historical", mode="lines",
+                    name="Actual Filings (Training Window)",
+                    mode="lines+markers",
                     line=dict(color="#1e3a8a", width=2.5),
-                    hovertemplate="%{x|%b %Y}  Filings: %{y}<extra></extra>"
+                    marker=dict(size=4, color="#1e3a8a"),
+                    hovertemplate="%{x|%b %Y}  Actual: <b>%{y:,.0f}</b><extra></extra>"
                 ))
-                if "Ensemble Forecast" in fcast_df.columns:
-                    fig_fc.add_trace(go.Scatter(
-                        x=fcast_df["Month"], y=fcast_df["Ensemble Forecast"],
-                        name="Ensemble Forecast", mode="lines+markers",
-                        line=dict(color="#dc2626", width=2.5, dash="dash"),
-                        marker=dict(size=5, symbol="diamond"),
-                        hovertemplate="%{x|%b %Y}  Forecast: %{y:.0f}<extra></extra>"
+
+                # ── 2. Model in-sample fitted line ────────────────────────────────────
+                if not fitted_df.empty and "Fitted" in fitted_df.columns:
+                    fig_avf.add_trace(go.Scatter(
+                        x=fitted_df["Month"], y=fitted_df["Fitted"],
+                        name="Model Fit (In-Sample)",
+                        mode="lines",
+                        line=dict(color="#f59e0b", width=2, dash="dot"),
+                        hovertemplate="%{x|%b %Y}  Model Fit: <b>%{y:,.0f}</b><extra></extra>"
                     ))
-                fig_fc.add_vline(
+
+                # ── 3. Ensemble forecast (future / forecast window) ───────────────────
+                if "Ensemble Forecast" in fcast_df.columns:
+                    fig_avf.add_trace(go.Scatter(
+                        x=fcast_df["Month"], y=fcast_df["Ensemble Forecast"],
+                        name="Ensemble Forecast",
+                        mode="lines+markers",
+                        line=dict(color="#dc2626", width=2.5, dash="dash"),
+                        marker=dict(size=5, symbol="diamond", color="#dc2626"),
+                        hovertemplate="%{x|%b %Y}  Forecast: <b>%{y:,.0f}</b><extra></extra>"
+                    ))
+
+                # ── 4. Actual data within the forecast window (backtesting overlay) ───
+                if has_actual_in_fcst:
+                    fig_avf.add_trace(go.Scatter(
+                        x=df_actual_in_fcst["Month"],
+                        y=df_actual_in_fcst["Filing_Count"],
+                        name="Actual Filings (Forecast Window)",
+                        mode="lines+markers",
+                        line=dict(color="#16a34a", width=2.5),
+                        marker=dict(size=6, color="#16a34a", symbol="circle"),
+                        hovertemplate="%{x|%b %Y}  Actual (observed): <b>%{y:,.0f}</b><extra></extra>"
+                    ))
+
+                    # Compute simple point-in-time accuracy for the overlap period
+                    try:
+                        merged_bk = pd.merge(
+                            df_actual_in_fcst.rename(columns={"Filing_Count": "Actual"}),
+                            fcast_df[["Month", "Ensemble Forecast"]].rename(columns={"Ensemble Forecast": "Predicted"}),
+                            on="Month", how="inner"
+                        )
+                        if not merged_bk.empty:
+                            mask = merged_bk["Actual"] > 0
+                            if mask.any():
+                                bk_mape = float(np.mean(
+                                    np.abs((merged_bk.loc[mask, "Actual"] - merged_bk.loc[mask, "Predicted"])
+                                           / merged_bk.loc[mask, "Actual"])
+                                ) * 100)
+                                bk_acc = max(0.0, 100.0 - bk_mape)
+                            else:
+                                bk_acc = None
+                        else:
+                            bk_acc = None
+                    except Exception:
+                        bk_acc = None
+                else:
+                    bk_acc = None
+
+                # ── Vertical separator at training/forecast boundary ──────────────────
+                fig_avf.add_vline(
                     x=hist_df["Month"].iloc[-1].timestamp() * 1000,
                     line_dash="dot", line_color="#94a3b8", line_width=1.5,
-                    annotation_text="Forecast >", annotation_position="top right"
+                    annotation_text="▶ Forecast Start", annotation_position="top right",
+                    annotation_font=dict(color="#64748b", size=11)
                 )
-                fig_fc.update_layout(
-                    height=340, hovermode="x unified", title=" Monthly Filing Forecast",
+
+                # ── Shaded forecast region ────────────────────────────────────────────
+                if "Ensemble Forecast" in fcast_df.columns and len(fcast_df) > 0:
+                    fig_avf.add_vrect(
+                        x0=fcast_df["Month"].iloc[0].timestamp() * 1000,
+                        x1=fcast_df["Month"].iloc[-1].timestamp() * 1000,
+                        fillcolor="rgba(220, 38, 38, 0.04)",
+                        layer="below", line_width=0
+                    )
+
+                fig_avf.update_layout(
+                    height=400, hovermode="x unified",
+                    title=dict(
+                        text=f" Monthly Filing Count — Actual vs Forecasted  ({fc_horizon}-Month Horizon)",
+                        font=dict(size=14, color="#0f172a")
+                    ),
                     xaxis_title=None, yaxis_title="Filings",
-                    legend=dict(orientation="h", y=1.05, x=0),
-                    margin=dict(l=50, r=30, t=50, b=40),
+                    legend=dict(orientation="h", y=1.1, x=0, font=dict(size=11)),
+                    margin=dict(l=50, r=30, t=70, b=40),
                     plot_bgcolor="#f8fafc", paper_bgcolor="#ffffff",
-                    xaxis=dict(showgrid=True, gridcolor="#e2e8f0"),
+                    xaxis=dict(showgrid=True, gridcolor="#e2e8f0", tickformat="%b %Y"),
                     yaxis=dict(showgrid=True, gridcolor="#e2e8f0"),
                 )
-                st.plotly_chart(fig_fc, use_container_width=True)
+                st.plotly_chart(fig_avf, use_container_width=True)
 
-                #  Row 2: Chapter breakdown (Full Width)
+                # ── Backtesting accuracy callout (when actual data overlaps forecast) ─
+                if has_actual_in_fcst and bk_acc is not None:
+                    bk_color = "#15803d" if bk_acc >= 85 else "#d97706" if bk_acc >= 70 else "#dc2626"
+                    st.markdown(
+                        f"""
+                        <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+                                    border: 1px solid #86efac; border-radius: 10px;
+                                    padding: 0.65rem 1.1rem; margin-bottom: 0.8rem;
+                                    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                            <span style="font-size:0.8rem; font-weight:700; color:#166534;
+                                         text-transform:uppercase; letter-spacing:0.05em;">
+                                 Backtest Result
+                            </span>
+                            <span style="font-size:0.875rem; color:#1e293b;">
+                                The model predicted <b>{len(df_actual_in_fcst)}</b> months where
+                                actual data is now available.
+                                Backtest accuracy:&nbsp;
+                                <b style="color:{bk_color}; font-size:1rem;">{bk_acc:.1f}%</b>
+                                &nbsp;(comparing forecast vs observed filings in that period).
+                            </span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                _mape_val = fc_result.get("metrics", {}).get("MAPE (%)", 0)
+                _mae_val  = fc_result.get("metrics", {}).get("MAE", 0)
+                _rmse_val = fc_result.get("metrics", {}).get("RMSE", 0)
+                _acc_color = "#15803d" if _acc >= 85 else "#d97706" if _acc >= 70 else "#dc2626"
+                st.markdown(
+                    f"""
+                    <div style="display:flex; gap:1.2rem; margin-bottom:1rem; flex-wrap:wrap;">
+                        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                                    padding:0.5rem 1rem; font-size:0.85rem;">
+                            <span style="color:#64748b; font-weight:600;">Model Accuracy</span>&nbsp;
+                            <span style="color:{_acc_color}; font-weight:700; font-size:1rem;">{_acc:.1f}%</span>
+                        </div>
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+                                    padding:0.5rem 1rem; font-size:0.85rem;">
+                            <span style="color:#64748b; font-weight:600;">MAE</span>&nbsp;
+                            <span style="color:#1e3a8a; font-weight:700;">{_mae_val:.1f}</span>
+                        </div>
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+                                    padding:0.5rem 1rem; font-size:0.85rem;">
+                            <span style="color:#64748b; font-weight:600;">RMSE</span>&nbsp;
+                            <span style="color:#1e3a8a; font-weight:700;">{_rmse_val:.1f}</span>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
                 df_chap_fc = run_chapter_forecast(df_series, horizon_months=fc_horizon)
                 if not df_chap_fc.empty:
                     chap_cols    = [c for c in df_chap_fc.columns if c != "Month"]
@@ -2522,7 +2726,6 @@ def main():
                     )
                     st.plotly_chart(fig_ch, use_container_width=True)
                     
-                    # Render peak captions in columns for visual appeal
                     cap_cols = st.columns(len(chap_cols))
                     for col_idx, col_f in enumerate(chap_cols):
                         ch_total = df_chap_fc[col_f].sum()
@@ -2534,7 +2737,6 @@ def main():
 
                 st.markdown("<hr style='margin: 1.5rem 0 !important; border-top: 1px solid #cbd5e1;'>", unsafe_allow_html=True)
 
-                #  Row 3: Risk score trajectory (Full Width)
                 df_risk_fc = run_risk_score_forecast(df_series, horizon_months=fc_horizon)
                 hist_risk  = df_series.dropna(subset=["Avg_Risk"])
                 fig_r = go.Figure()
@@ -2580,10 +2782,8 @@ def main():
                     latest_r = hist_risk["Avg_Risk"].iloc[-1]
                     future_r = df_risk_fc["Forecasted Avg Risk Score"].iloc[-1]
                     delta_r  = future_r - latest_r
-                    direction = "" if delta_r > 0 else ""
+                    direction = "⬆" if delta_r > 0 else "⬇"
                     st.caption(f"Risk at horizon end: **{future_r:.1f}** ({direction}{abs(delta_r):.1f} pts from {latest_r:.1f})")
-
-
 
     # -----------------------------------------------------------------
     # WORKSPACE: QUERY BOX

@@ -210,69 +210,69 @@ class InsightVisualizer:
         return bar_data.sort_values(value_col, ascending=True)
 
     def _build_llm_summary_prompt(
-    self,
-    stats: Dict,
-    numeric_insights: Dict,
-    categorical_insights: Dict,
-        ) -> str:
+        self,
+        stats: Dict,
+        numeric_insights: Dict,
+        categorical_insights: Dict,
+    ) -> str:
         """Build a prompt for the LLM summarizing dataset trends and drivers."""
         prompt_lines = [
-            "Role: You are an expert data analyst.",
-            "Task: Provide a 3-5 liner sharp, practical summary of the dataset's key trends and drivers.",
+            "Role: You are an elite strategic credit risk advisor and business intelligence analyst.",
+            "Task: Generate a highly polished, client-focused 'Trend Summary Analysis' based on the dataset characteristics provided below.",
             "",
-            "Constraints:",
-            "- NO raw statistics (mean, median, etc.).",
-            "- NO technical jargon, SQL, code, or data quality reports.",
-            "- NO generic filler or introductory fluff.",
-            "- Format: Use plain English. **Bold** key findings and insights.",
-            "- Length: Keep the response to a few concise sentences.",
+            "CRITICAL FORMATTING RULES (follow exactly):",
+            "1. Tone: Professional, executive-level, clear, and highly authoritative. Speak directly to business leaders/clients.",
+            "2. Use the exact markdown structure shown below — do NOT merge sections into a single paragraph.",
+            "3. Each section MUST start on its own new line with a markdown header (## or ###).",
+            "4. The 'Key Drivers & Concentrations' section MUST be a bullet list using '- ' prefix for each item.",
+            "5. Use **bold** to emphasize key numbers, percentages, and names.",
+            "6. Do NOT write prose paragraphs where bullet lists are required.",
+            "7. Keep total output under 160 words. No introductory or concluding meta-text.",
             "",
-            "Focus solely on what is driving the data and the most important business insights.",
+            "REQUIRED OUTPUT STRUCTURE (use this exact format):",
+            "## Executive Trend Overview",
+            "<1-2 sentence summary of overall volume and distribution trajectory>",
             "",
+            "## Key Drivers & Concentrations",
+            "- <Driver 1: e.g., top states/territories with % share>",
+            "- <Driver 2: e.g., dominant bankruptcy chapter with % share>",
+            "- <Driver 3: e.g., primary risk profile or debtor type>",
+            "",
+            "## Strategic Client Implications",
+            "<1-2 sentences on portfolio management, resource allocation, or operational risk>",
+            "",
+            "Tone: Professional, executive-level, authoritative. Speak directly to business leaders.",
+            "Focus: Translate statistics into strategic business insights. Avoid column names, SQL, or data-quality language.",
+            "",
+            "Dataset Metadata & Aggregated Statistics:",
         ]
 
-
-
         if self.insights.date_cols:
-            prompt_lines.append(f"Detected date-like columns: {', '.join(self.insights.date_cols)}")
+            prompt_lines.append(f"- Temporal/Date Columns detected: {', '.join(self.insights.date_cols)}")
 
         if self.insights.numeric_cols:
-            prompt_lines.append(f"Numeric columns: {', '.join(self.insights.numeric_cols)}")
-            prompt_lines.append("Top numeric summaries:")
+            prompt_lines.append(f"- Numeric Columns detected: {', '.join(self.insights.numeric_cols)}")
+            prompt_lines.append("  Summary stats:")
             for col, col_stats in list(numeric_insights.items())[:3]:
                 prompt_lines.append(
-                    f"- {col}: mean={round(col_stats['mean'], 2)}, median={round(col_stats['median'], 2)}, "
-                    f"min={round(col_stats['min'], 2)}, max={round(col_stats['max'], 2)}, outliers={col_stats['outlier_count']}"
+                    f"    * {col}: Average={round(col_stats['mean'], 2)}, Median={round(col_stats['median'], 2)}, "
+                    f"Min={round(col_stats['min'], 2)}, Max={round(col_stats['max'], 2)}, Outliers count={col_stats['outlier_count']}"
                 )
 
         if self.insights.categorical_cols:
-            prompt_lines.append(f"Categorical columns: {', '.join(self.insights.categorical_cols)}")
-            prompt_lines.append("Top categorical distributions:")
+            prompt_lines.append(f"- Categorical Columns detected: {', '.join(self.insights.categorical_cols)}")
+            prompt_lines.append("  Top distributions:")
             for col, cat_stats in list(categorical_insights.items())[:3]:
                 top_categories = cat_stats.get('top_categories', {})
                 category_summary = ', '.join([
-                    f"{k} ({v})" for k, v in list(top_categories.items())[:3]
+                    f"{k} (count: {v})" for k, v in list(top_categories.items())[:3]
                 ])
                 prompt_lines.append(
-                    f"- {col}: unique={cat_stats['unique_count']}, top={category_summary}"
-                )
-
-        if stats.get('missing_values'):
-            missing_cols = [col for col, count in stats['missing_values'].items() if count > 0]
-            if missing_cols:
-                prompt_lines.append(
-                    f"Columns with missing data: {', '.join(missing_cols)}"
+                    f"    * {col}: Unique count={cat_stats['unique_count']}, Top occurrences={category_summary}"
                 )
 
         prompt_lines.append("")
-        prompt_lines.append(
-            "Please summarize the most important patterns, trends, potential drivers, "
-            "and data quality issues in this dataset."
-        )
-        prompt_lines.append(
-            "If the dataset appears to have clear temporal trends, mention them. "
-            "If the dataset is limited or sparse, note that too."
-        )
+        prompt_lines.append("Generate the Trend Summary Analysis now, adhering strictly to the Tone & Style Guidelines. Do not include any introductory or concluding meta-text.")
 
         return "\n".join(prompt_lines)
 
@@ -306,8 +306,20 @@ class InsightVisualizer:
 
         llm_summary = self._generate_llm_summary(stats)
         if llm_summary:
-            st.subheader("Trend Summary Analysis")
-            st.markdown(llm_summary)
+            import re
+            # Scale heading font sizes to 60% of Streamlit defaults:
+            # ## (h2) default ~1.75rem → 1.05rem | ### (h3) default ~1.25rem → 0.75rem
+            scaled = re.sub(
+                r'^## (.+)$',
+                r'<h2 style="font-size:1.05rem;font-weight:700;margin:10px 0 4px 0;">\1</h2>',
+                llm_summary, flags=re.MULTILINE
+            )
+            scaled = re.sub(
+                r'^### (.+)$',
+                r'<h3 style="font-size:0.75rem;font-weight:600;margin:6px 0 4px 0;">\1</h3>',
+                scaled, flags=re.MULTILINE
+            )
+            st.markdown(scaled, unsafe_allow_html=True)
 
         # Missing data report
         missing_report = self.insights.get_missing_data_report()
@@ -351,72 +363,93 @@ class InsightVisualizer:
         
         if len(key_numeric) > 0:
             st.subheader("Numeric Distributions (Bar Plot)")
-            
-            # Create bar plots for numeric distributions
-            cols = st.columns(min(3, len(key_numeric)))
+
+            num_charts = len(key_numeric)
+            # Use full-width single column for 1 chart, else split into columns
+            use_full_width = (num_charts == 1)
+            if use_full_width:
+                chart_containers = [st.container()]
+            else:
+                chart_containers = st.columns(min(3, num_charts))
             
             for idx, col in enumerate(key_numeric):
                 col_data = self.df[col].dropna()
                 if len(col_data) < 2:
                     continue
-                
-                with cols[idx % 3]:
-                    fig, ax = plt.subplots(figsize=(5.2, 3.6))
+
+                # ── Adaptive figsize ──────────────────────────────────────────
+                is_aggregated = (
+                    len(self.insights.categorical_cols) >= 1
+                    and len(self.insights.numeric_cols) == 1
+                )
+                if is_aggregated:
+                    cat_col = self.insights.categorical_cols[0]
+                    bar_data = self.df[[cat_col, col]].drop_duplicates()
+                    n_bars = len(bar_data)
+                else:
+                    n_bars = 15  # histogram bins
+
+                if use_full_width:
+                    # Full-width: wide & tall enough to breathe
+                    fig_w = 10
+                    fig_h = max(4.0, min(6.0, 3.0 + n_bars * 0.12))
+                else:
+                    # Multi-column: compact but scale height with bar count
+                    fig_w = 5.0
+                    fig_h = max(3.2, min(5.5, 2.8 + n_bars * 0.10))
+
+                # Font scale: smaller when many bars, larger when few
+                label_fs  = max(6, min(9,  10 - n_bars // 6))
+                tick_fs   = max(6, min(8,   9 - n_bars // 8))
+                val_fs    = max(5, min(8,   9 - n_bars // 7))
+                # ─────────────────────────────────────────────────────────────
+
+                ctx = chart_containers[0] if use_full_width else chart_containers[idx % 3]
+                with ctx:
+                    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
                     
-                    # Check if this is aggregated data (categorical + numeric pattern)
-                    # If there's 1 categorical and 1 numeric column, show aggregated view
-                    if len(self.insights.categorical_cols) >= 1 and len(self.insights.numeric_cols) == 1:
-                        # This is aggregated data - show actual values with categories
-                        cat_col = self.insights.categorical_cols[0]
-                        
-                        # Create data for bar chart
-                        bar_data = self.df[[cat_col, col]].drop_duplicates()
+                    if is_aggregated:
                         bar_data = self._sort_bar_data_by_category(bar_data, cat_col, col)
                         
-                        # Create bar plot with category labels
                         bars = ax.bar(range(len(bar_data)), bar_data[col].values,
                                      color=CHART_COLORS[0], alpha=0.95, edgecolor=BG_PANEL, linewidth=1.2)
                         
-                        # Set X-axis to show category names
                         ax.set_xticks(range(len(bar_data)))
-                        ax.set_xticklabels(bar_data[cat_col].values, rotation=45, ha='right', fontsize=8)
+                        rotation = 45 if n_bars > 6 else 0
+                        ax.set_xticklabels(bar_data[cat_col].values, rotation=rotation,
+                                           ha='right' if rotation else 'center', fontsize=tick_fs)
                         
-                        # Add value labels on bars
                         for bar in bars:
                             height = bar.get_height()
-                            ax.text(bar.get_x() + bar.get_width()/2., height,
-                                   f'{int(height)}',
-                                   ha='center', va='bottom', fontsize=8, fontweight='bold', color=TEXT_MAIN)
+                            ax.text(bar.get_x() + bar.get_width() / 2., height,
+                                    f'{int(height)}',
+                                    ha='center', va='bottom', fontsize=val_fs,
+                                    fontweight='bold', color=TEXT_MAIN)
                         
-                        # Set labels and title
-                        ax.set_title(f"{col} by {cat_col}", fontsize=10, fontweight="bold")
-                        ax.set_xlabel(cat_col, fontsize=8, fontweight='bold')
-                        ax.set_ylabel(col, fontsize=8, fontweight='bold')
+                        ax.set_title(f"{col} by {cat_col}", fontsize=11 if use_full_width else 10,
+                                     fontweight="bold")
+                        ax.set_xlabel(cat_col, fontsize=label_fs, fontweight='bold')
+                        ax.set_ylabel(col, fontsize=label_fs, fontweight='bold')
                     else:
-                        # This is raw data - show distribution with binned frequencies
-                        # Create bins and get counts
                         counts, bins = np.histogram(col_data, bins=15)
-                        bin_centers = (bins[:-1] + bins[1:]) / 2
                         
-                        # Create bar plot
                         bars = ax.bar(range(len(counts)), counts, color=CHART_COLORS[0],
                                      alpha=0.99, edgecolor=BG_PANEL, linewidth=1.2)
                         
-                        # Add value labels on bars
                         for bar in bars:
                             height = bar.get_height()
-                            ax.text(bar.get_x() + bar.get_width()/2., height,
-                                   f'{int(height)}',
-                                   ha='center', va='bottom', fontsize=8, fontweight='bold', color=TEXT_MAIN)
+                            ax.text(bar.get_x() + bar.get_width() / 2., height,
+                                    f'{int(height)}',
+                                    ha='center', va='bottom', fontsize=val_fs,
+                                    fontweight='bold', color=TEXT_MAIN)
                         
-                        # Set labels and title
-                        ax.set_title(f"{col} Distribution", fontsize=10, fontweight="bold")
-                        ax.set_xlabel(f"{col} Value Ranges", fontsize=8, fontweight='bold')
-                        ax.set_ylabel("Frequency (Count)", fontsize=8, fontweight='bold')
+                        ax.set_title(f"{col} Distribution", fontsize=11 if use_full_width else 10,
+                                     fontweight="bold")
+                        ax.set_xlabel(f"{col} Value Ranges", fontsize=label_fs, fontweight='bold')
+                        ax.set_ylabel("Frequency (Count)", fontsize=label_fs, fontweight='bold')
                     
                     ax.grid(axis="y", alpha=0.3, linestyle="--")
                     ax.set_axisbelow(True)
-                    
                     plt.tight_layout()
                     st.pyplot(fig, use_container_width=True, clear_figure=True)
     
@@ -506,65 +539,106 @@ class InsightVisualizer:
         
         if key_categorical:
             st.subheader(" Category Distributions (Pie Charts)")
-            
-            cols = st.columns(min(3, len(key_categorical)))
+
+            num_pies = len(key_categorical)
+            use_full_width = (num_pies == 1)
+            if use_full_width:
+                pie_containers = [st.container()]
+            else:
+                pie_containers = st.columns(min(3, num_pies))
             
             for idx, col in enumerate(key_categorical):
-                with cols[idx % 3]:
-                    # Check if we have aggregated data (categorical + numeric pattern)
-                    # If so, use the numeric column as values instead of value_counts()
-                    
-                    # For each categorical column, check if there's an associated numeric column
-                    value_col = None
-                    
-                    # Strategy 1: If there's only 1 numeric column and 1-2 categorical columns, use the numeric one
-                    if len(self.insights.numeric_cols) == 1 and len(self.insights.categorical_cols) <= 2:
-                        value_col = self.insights.numeric_cols[0]
-                    
-                    # Strategy 2: Look for columns named "count", "total", "frequency", etc.
-                    if value_col is None:
-                        possible_value_cols = [c for c in self.insights.numeric_cols 
-                                             if any(x in c.lower() for x in ['count', 'total', 'frequency', 'value', 'sum'])]
-                        if possible_value_cols:
-                            value_col = possible_value_cols[0]
-                    
-                    # Get the data for the pie chart
-                    if value_col:
-                        # Use aggregated data: categorical column values with numeric column as pie sizes
-                        cat_data = self.df[[col, value_col]].drop_duplicates().sort_values(value_col, ascending=True)
-                        pie_data = cat_data.set_index(col)[value_col]
-                    else:
-                        # Fall back to value_counts() for raw data
-                        pie_data = self.df[col].astype(str).value_counts()
-                    
-                    if len(pie_data) == 0:
-                        continue
-                    
-                    # PIE CHART with proper formatting
-                    fig, ax = plt.subplots(figsize=(5.2, 4.2))
-                    colors = CHART_COLORS[:len(pie_data)]
+                # Resolve value column
+                value_col = None
+                if len(self.insights.numeric_cols) == 1 and len(self.insights.categorical_cols) <= 2:
+                    value_col = self.insights.numeric_cols[0]
+                if value_col is None:
+                    possible_value_cols = [c for c in self.insights.numeric_cols 
+                                         if any(x in c.lower() for x in ['count', 'total', 'frequency', 'value', 'sum'])]
+                    if possible_value_cols:
+                        value_col = possible_value_cols[0]
+                
+                if value_col:
+                    cat_data = self.df[[col, value_col]].drop_duplicates().sort_values(value_col, ascending=True)
+                    pie_data = cat_data.set_index(col)[value_col]
+                else:
+                    pie_data = self.df[col].astype(str).value_counts()
+                
+                if len(pie_data) == 0:
+                    continue
+
+                # ── Adaptive figsize & font scale by slice count ─────────────
+                n_slices = len(pie_data)
+                if use_full_width:
+                    fig_w = fig_h = max(6.0, min(9.0, 5.0 + n_slices * 0.2))
+                else:
+                    fig_w = fig_h = max(4.2, min(6.5, 3.8 + n_slices * 0.18))
+
+                label_fs  = max(6, min(10, 11 - n_slices // 3))
+                pct_fs    = max(6, min(9,  10 - n_slices // 4))
+                title_fs  = 12 if use_full_width else 10
+                # ─────────────────────────────────────────────────────────────
+
+                ctx = pie_containers[0] if use_full_width else pie_containers[idx % 3]
+                with ctx:
+                    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+                    colors = CHART_COLORS[:n_slices]
+
+                    # For many slices suppress labels on tiny wedges to avoid overlap
+                    display_labels = pie_data.index.tolist()
+                    if n_slices > 8:
+                        threshold = pie_data.sum() * 0.03
+                        display_labels = [
+                            lbl if val >= threshold else ''
+                            for lbl, val in zip(pie_data.index, pie_data.values)
+                        ]
+
+                    total = pie_data.sum()
+
+                    # Custom autopct: show count on line 1, pct on line 2
+                    def make_autopct(values):
+                        def autopct(pct):
+                            count = int(round(pct / 100.0 * total))
+                            return f"{count:,}\n({pct:.1f}%)"
+                        return autopct
+
                     wedges, texts, autotexts = ax.pie(
-                        pie_data.values, 
-                        labels=pie_data.index, 
-                        autopct="%1.1f%%",
+                        pie_data.values,
+                        labels=display_labels,
+                        autopct=make_autopct(pie_data.values),
                         startangle=90,
                         colors=colors,
-                        textprops={'fontsize': 8}
+                        textprops={'fontsize': label_fs},
+                        pctdistance=0.78,
                     )
-                    # Enhance text readability
                     for autotext in autotexts:
                         autotext.set_color('white')
                         autotext.set_fontweight('bold')
-                        autotext.set_fontsize(8)
-                    
-                    # Add title with value column info if using aggregated data
-                    if value_col:
-                        title = f"{col} Distribution (by {value_col})"
-                    else:
-                        title = f"{col} Distribution"
-                    
-                    ax.set_title(title, fontsize=10, fontweight="bold", pad=10)
+                        autotext.set_fontsize(pct_fs)
+
+                    title = (
+                        f"{col} Distribution (by {value_col})"
+                        if value_col else f"{col} Distribution"
+                    )
+                    ax.set_title(title, fontsize=title_fs, fontweight="bold", pad=12)
                     ax.axis("equal")
+
+                    # Legend with count + pct for every slice
+                    legend_labels = [
+                        f"{lbl}:  {int(val):,}  ({val / total * 100:.1f}%)"
+                        for lbl, val in zip(pie_data.index, pie_data.values)
+                    ]
+                    ax.legend(
+                        wedges, legend_labels,
+                        title="Category", title_fontsize=max(6, pct_fs - 1),
+                        loc="lower center",
+                        bbox_to_anchor=(0.5, -0.18),
+                        ncol=min(3, n_slices),
+                        fontsize=max(5, pct_fs - 1),
+                        frameon=True,
+                        framealpha=0.85,
+                        edgecolor=GRID_LINE,
+                    )
                     plt.tight_layout()
                     st.pyplot(fig, use_container_width=True, clear_figure=True)
     

@@ -214,6 +214,105 @@ def get_actual_database_schema():
 
 
 # =============================================================================
+# SMART QUERY UNDERSTANDING (HAIKU PRE-PROCESSOR)
+# =============================================================================
+
+def smart_query_understanding(user_query: str, schema: dict, conversation_memory: dict = None) -> dict:
+    """
+    Use a dedicated Claude Haiku session to understand any user question by
+    referencing the full schema.json as a knowledge base.
+
+    Returns a dict with:
+      - normalized_query: A rewritten, schema-aware version of the user query
+      - intent: One of 'data_retrieval', 'aggregation', 'filter', 'visualization', 'follow_up', 'unclear'
+      - relevant_columns: List of column names from the schema that are relevant
+      - time_filter: Any detected time/date constraint (or None)
+      - is_answerable: True if the query can be answered from the schema
+      - clarification_needed: A short message if the query is unclear (or None)
+    """
+    try:
+        # Build a compact schema summary for the prompt
+        schema_cols = schema.get("columns", []) if schema else []
+        table_name = schema.get("table_name", "bankruptcy_data") if schema else "bankruptcy_data"
+        schema_summary_lines = [
+            f"  - {col['name']} ({col.get('type', 'string')}): {col.get('description', '')}"
+            for col in schema_cols
+        ]
+        schema_text = f"Table: {table_name}\nColumns:\n" + "\n".join(schema_summary_lines)
+
+        # Build recent conversation context
+        conv_context = ""
+        if conversation_memory and conversation_memory.get("history"):
+            recent = conversation_memory["history"][-3:]
+            lines = []
+            for entry in recent:
+                lines.append(f"  User: {entry.get('user_question', '')}")
+                if entry.get("sql_query"):
+                    lines.append(f"  SQL result: {entry.get('record_count', 0)} rows")
+            conv_context = "Recent conversation:\n" + "\n".join(lines) + "\n\n"
+
+        prompt = (
+            "You are a smart query understanding assistant for a bankruptcy case management dashboard.\n"
+            "Your job is to analyze the user's question and map it to the database schema below.\n\n"
+            f"DATABASE SCHEMA:\n{schema_text}\n\n"
+            f"{conv_context}"
+            "USER QUESTION: \"" + user_query + "\"\n\n"
+            "INSTRUCTIONS:\n"
+            "1. Understand the user's intent (data_retrieval, aggregation, filter, visualization, follow_up, or unclear).\n"
+            "2. Rewrite the question as a clear, unambiguous SQL-ready English query using exact column names from the schema.\n"
+            "   - Map informal terms to schema columns (e.g., 'debtor name' → First_name, Last_name; 'filing date' → date_filed; 'state' → State).\n"
+            "   - Expand abbreviations and correct spelling based on schema knowledge.\n"
+            "   - Preserve all filters, conditions, and aggregation requests.\n"
+            "3. List the relevant column names from the schema.\n"
+            "4. Extract any time/date filter mentioned (e.g., '2024', 'last year', 'Q1 2023') or null.\n"
+            "5. Determine if the question is answerable from the schema (true/false).\n"
+            "6. If unclear or unanswerable, provide a brief clarification message.\n\n"
+            "Return ONLY a valid JSON object with these exact keys:\n"
+            "{\n"
+            '  "normalized_query": "...",\n'
+            '  "intent": "data_retrieval|aggregation|filter|visualization|follow_up|unclear",\n'
+            '  "relevant_columns": ["col1", "col2"],\n'
+            '  "time_filter": "2024" or null,\n'
+            '  "is_answerable": true or false,\n'
+            '  "clarification_needed": "..." or null\n'
+            "}\n"
+            "Do NOT include markdown, explanations, or any text outside the JSON."
+        )
+
+        response = call_llm_haiku(prompt)
+        logger.info("Smart query understanding response: %s", response[:300] if response else "EMPTY")
+
+        # Parse the JSON response
+        cleaned = response.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```$", "", cleaned)
+
+        result = json.loads(cleaned)
+
+        # Validate and normalize result keys
+        return {
+            "normalized_query": result.get("normalized_query", user_query).strip(),
+            "intent": result.get("intent", "data_retrieval"),
+            "relevant_columns": result.get("relevant_columns", []),
+            "time_filter": result.get("time_filter"),
+            "is_answerable": bool(result.get("is_answerable", True)),
+            "clarification_needed": result.get("clarification_needed"),
+        }
+
+    except Exception as e:
+        logger.warning("Smart query understanding failed (falling back to original query): %s", e)
+        return {
+            "normalized_query": user_query,
+            "intent": "data_retrieval",
+            "relevant_columns": [],
+            "time_filter": None,
+            "is_answerable": True,
+            "clarification_needed": None,
+        }
+
+
+# =============================================================================
 # SQL CONVERSION & VALIDATION
 # =============================================================================
 
@@ -717,8 +816,34 @@ def _handle_user_query(user_query, schema, active_schema):
     """Handle user queries by generating, validating, executing SQL and generating insights"""
     try:
         logger.info("Processing user query: %s", user_query)
-        
-        is_followup = is_followup_question(user_query, st.session_state.conversation_memory)
+
+        # ── Smart Query Understanding (Haiku pre-processor) ────────────────────
+        schema_for_understanding = active_schema if active_schema else schema
+        understanding = smart_query_understanding(
+            user_query,
+            schema_for_understanding,
+            st.session_state.get("conversation_memory"),
+        )
+        logger.info(
+            "Query understanding | intent=%s | answerable=%s | normalized=%s",
+            understanding["intent"],
+            understanding["is_answerable"],
+            understanding["normalized_query"][:120],
+        )
+
+        # If the query is deemed unanswerable from schema, surface clarification
+        if not understanding["is_answerable"] and understanding["clarification_needed"]:
+            clarification_msg = f"❓ {understanding['clarification_needed']}"
+            st.warning(clarification_msg)
+            _append_conversation_memory(user_query, "", None, answer=clarification_msg)
+            st.session_state.messages.append({"role": "assistant", "content": clarification_msg})
+            return
+
+        # Use the normalized query for all downstream processing
+        effective_query = understanding["normalized_query"] if understanding["normalized_query"] else user_query
+        # ── End Smart Query Understanding ──────────────────────────────────────
+
+        is_followup = is_followup_question(effective_query, st.session_state.conversation_memory)
         
         if is_followup and st.session_state.temp_table_schema:
             working_schema = st.session_state.temp_table_schema
@@ -726,7 +851,7 @@ def _handle_user_query(user_query, schema, active_schema):
             logger.info("Using temporary table for follow-up query | table=%s", working_schema.get('table_name'))
         else:
             working_schema = active_schema if active_schema else schema
-            if any(kw in user_query.lower() for kw in ['clear', 'reset', 'new query', 'fresh', 'different']):
+            if any(kw in effective_query.lower() for kw in ['clear', 'reset', 'new query', 'fresh', 'different']):
                 if st.session_state.temp_table_name:
                     drop_temporary_table(st.session_state.temp_table_name)
                     st.session_state.temp_table_name = None
@@ -742,7 +867,7 @@ def _handle_user_query(user_query, schema, active_schema):
             "validation": validation_token_usage,
         }
 
-        cache_key = _make_query_cache_key(user_query, working_schema, st.session_state.conversation_memory)
+        cache_key = _make_query_cache_key(effective_query, working_schema, st.session_state.conversation_memory)
 
         if cache_key in st.session_state.query_cache:
             cached_response = st.session_state.query_cache[cache_key]
@@ -776,7 +901,7 @@ def _handle_user_query(user_query, schema, active_schema):
 
         is_visualization_fallback = False
         main_db_schema = active_schema if active_schema else schema
-        if is_followup and st.session_state.temp_table_dataframe is not None and is_pure_chart_request(user_query):
+        if is_followup and st.session_state.temp_table_dataframe is not None and is_pure_chart_request(effective_query):
             logger.info("Pure chart request detected. Bypassing SQL generation and reusing active dataset.")
             final_query = st.session_state.temp_table_source_query
             result_df = st.session_state.temp_table_dataframe
@@ -787,14 +912,14 @@ def _handle_user_query(user_query, schema, active_schema):
         if not is_visualization_fallback:
             with st.spinner(""):
                 sql_query = generate_sql_from_question(
-                    user_query,
+                    effective_query,
                     working_schema,
                     st.session_state.conversation_memory,
                     token_usage=generation_token_usage,
                     main_schema=main_db_schema,
                 )
 
-            if not sql_query and is_followup and st.session_state.temp_table_dataframe is not None and is_chart_request(user_query):
+            if not sql_query and is_followup and st.session_state.temp_table_dataframe is not None and is_chart_request(effective_query):
                 logger.info("Empty SQL generated for chart follow-up query. Re-using active dataset.")
                 final_query = st.session_state.temp_table_source_query
                 result_df = st.session_state.temp_table_dataframe
@@ -811,7 +936,7 @@ def _handle_user_query(user_query, schema, active_schema):
             
             with st.spinner(""):
                 validation_result = validate_sql_with_judge(
-                    sql_query, user_query, working_schema, main_schema=main_db_schema
+                    sql_query, effective_query, working_schema, main_schema=main_db_schema
                 )
             
             final_query = sql_query
@@ -833,8 +958,8 @@ def _handle_user_query(user_query, schema, active_schema):
                     })
                     return
             else:
-                st.success(" SQL validation passed!")
-            
+                st.success(" ")
+
             with st.spinner(""):
                 result_df = execute_sql_query(final_query)
             
@@ -879,9 +1004,8 @@ def _handle_user_query(user_query, schema, active_schema):
             return
         
         success_msg = f" Generated chart for the active dataset:" if is_visualization_fallback else f" Query results: "
-        st.success(success_msg)
+        st.success("")
         st.dataframe(format_table(result_df), width='stretch', hide_index=True)
-        
         if not is_followup:
             temp_table_name, temp_schema = create_temporary_table_from_dataframe(result_df, final_query)
             if temp_table_name and temp_schema:
@@ -891,14 +1015,14 @@ def _handle_user_query(user_query, schema, active_schema):
                 st.session_state.temp_table_dataframe = result_df
                 st.info(f" Result set stored as temporary table. You can ask follow-up questions about these {len(result_df)} records.")
         
-        should_insights = should_generate_insights(user_query, result_df) or is_visualization_fallback
-        chart_type = detect_chart_type(user_query)
+        should_insights = should_generate_insights(effective_query, result_df) or is_visualization_fallback
+        chart_type = detect_chart_type(effective_query)
         
         if should_insights and (len(result_df) >= 2 or is_visualization_fallback):
             with st.expander(" View Insights and Charts", expanded=True):
                 generate_insights(result_df, chart_type=chart_type, user_query=user_query)
         
-        _append_conversation_memory(user_query, final_query, result_df.to_dict('records'), validation_result)
+        _append_conversation_memory(effective_query, final_query, result_df.to_dict('records'), validation_result)
         
         st.session_state.messages.append({
             "role": "assistant",
@@ -1002,7 +1126,7 @@ def render_query_box_tab(schema, active_schema):
     # DYNAMIC AUTO PROMPT SUGGESTIONS (TEXTUAL & VISUAL) via Bedrock Haiku
     # -------------------------------------------------------------------------
     schema_to_use = active_schema if active_schema else schema
-    with st.spinner("💡 Updating suggested prompts..."):
+    with st.spinner(" Updating suggested prompts..."):
         suggestions = _generate_dynamic_prompt_suggestions(
             schema_to_use, st.session_state.conversation_memory
         )
