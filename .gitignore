@@ -4,3 +4,19 @@
 __pycache__
 .ipynb_checkpoints
 *.pyc
+
+# Logs
+*.log
+
+# Databases (runtime files)
+data.db
+.langchain_cache.db
+.litellm_prompt_cache.db
+
+# Large/binary files
+*.zip
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
