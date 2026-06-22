@@ -55,7 +55,16 @@ def load_schema():
 
 def clean_and_validate_suggestions(data, schema):
     """Post-process and validate suggestions to ensure they strictly conform to user rules."""
-    visual_kws = ["show", "draw", "display", "plot", "chart", "graph", "visualize", "visualise", "breakdown", "distribution", "trend", "trends", "view", "pie", "bar", "line", "donut", "histogram", "heatmap", "scatter", "area"]
+    chart_kws = ["plot", "chart", "graph", "pie", "bar", "line", "donut", "histogram", "heatmap", "scatter", "area"]
+    action_verbs = ["show", "draw", "display", "visualize", "visualise", "view"]
+    analytical_kws = ["breakdown", "distribution", "trend", "trends"]
+    
+    # Textual suggestions should NOT contain chart words or action verbs.
+    # Analytical terms like "breakdown", "distribution", "trend" are perfectly fine for textual queries.
+    textual_forbidden_kws = chart_kws + action_verbs
+    
+    # Visual suggestions are validated using the full list of visual keywords
+    visual_kws = chart_kws + action_verbs + analytical_kws
     
     textual = []
     visual = []
@@ -71,14 +80,14 @@ def clean_and_validate_suggestions(data, schema):
             continue
         q_lower = q_str.lower()
         
-        # Check if it has any visual keyword
-        has_visual_kw = any(re.search(rf"\b{kw}\b", q_lower) for kw in visual_kws)
-        if has_visual_kw:
+        # Check if it has any forbidden keyword
+        has_forbidden_kw = any(re.search(rf"\b{kw}\b", q_lower) for kw in textual_forbidden_kws)
+        if has_forbidden_kw:
             # Try to rewrite it by replacing the visual action verb at the start
             cleaned_q = q_str
             cleaned_q = re.sub(r"^(show|display|draw|view|plot|visualize|visualise)\b", "", cleaned_q, flags=re.IGNORECASE).strip()
             q_lower_new = cleaned_q.lower()
-            if any(re.search(rf"\b{kw}\b", q_lower_new) for kw in visual_kws):
+            if any(re.search(rf"\b{kw}\b", q_lower_new) for kw in textual_forbidden_kws):
                 continue # discard it
             else:
                 # Rewrite leading question prefix
@@ -111,7 +120,6 @@ def clean_and_validate_suggestions(data, schema):
     
     # 3. Formulate fallback lists for padding
     fallback_textual = [
-        "What is the total number of cases?",
         "Filter cases by Chapter 7 filings",
         "Identify the top 10 states by case volume",
         "List the most recent 10 records in the dataset",

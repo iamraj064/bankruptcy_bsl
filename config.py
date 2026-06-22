@@ -465,6 +465,7 @@ def call_llm_haiku2(
 
     # Use Bedrock if configured via env var
     bedrock_model = os.getenv('BEDROCK_HAIKU_MODEL_ID')
+    logger.info("Using AWS haiku2 backend | model=%s prompt_chars=%s", bedrock_model, len(prompt)) 
     if bedrock_model:
         # Avoid Opus on-demand ValidationException
         #if bedrock_model == 'anthropic.claude-opus-4-8':
@@ -516,8 +517,13 @@ def call_llm_haiku2(
             raise RuntimeError(f'Bedrock call failed: {e}')
 
     # Fallback to OpenAI
+    if OpenAI is None:
+        raise RuntimeError('openai package not installed and Bedrock not configured')
+    resolved_key = api_key or os.getenv('OPENAI_API_KEY')
+    if not resolved_key:
+        raise RuntimeError('OPENAI_API_KEY not set and no api_key provided')
 
-    logger.info("Using Anthropic backend | model=%s prompt_chars=%s", model, len(prompt))
+    logger.info("Using OpenAI backend | model=%s prompt_chars=%s", model, len(prompt))
     start = time.perf_counter()
     openai_client = OpenAI(api_key=resolved_key)
     resp = openai_client.chat.completions.create(
