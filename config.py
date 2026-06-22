@@ -64,42 +64,69 @@ def call_llm(
     """
     Call an LLM to convert natural language to SQL.
     Preference order:
-      1. AWS Bedrock when `BEDROCK_MODEL_ID` is configured
-      2. OpenAI ChatCompletion when OpenAI API key is available
+      1. AWS Bedrock with primary model BEDROCK_MODEL_ID (overridden to Claude 3 Haiku)
+      2. Fallback to AWS Bedrock with 'meta.llama3-8b-instruct-v1:0'
     """
+    # Use Bedrock
+    bedrock_model = os.getenv('BEDROCK_MODEL_ID') or "anthropic.claude-3-haiku-20240307-v1:0"
+    if bedrock_model in ['meta.llama3-8b-instruct-v1:0', 'anthropic.claude-opus-4-8']:
+        bedrock_model = 'anthropic.claude-3-haiku-20240307-v1:0'
 
-    # Use Bedrock if configured via env var
-    bedrock_model = os.getenv('BEDROCK_MODEL_ID')
-    if bedrock_model:
-        # Override to Claude 3 Haiku for superior SQL generation reasoning, and avoid Opus on-demand failure
-        if bedrock_model in ['meta.llama3-8b-instruct-v1:0', 'anthropic.claude-opus-4-8']:
-            bedrock_model = 'anthropic.claude-3-haiku-20240307-v1:0'
-        logger.info("Using AWS Bedrock backend | model=%s prompt_chars=%s", bedrock_model, len(prompt))
-        if boto3 is None:
-            raise RuntimeError('boto3 package not installed')
+    logger.info("Using AWS Bedrock backend | model=%s prompt_chars=%s", bedrock_model, len(prompt))
+    if boto3 is None:
+        raise RuntimeError('boto3 package not installed')
+
+    try:
+        start = time.perf_counter()
+        bedrock_client = boto3.client(
+            'bedrock-runtime',
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+            region_name=os.getenv('AWS_REGION') or None,
+        )
+
+        messages = [{
+            "role": "user",
+            "content": [{"text": prompt}]
+        }]
+
+        response = bedrock_client.converse(
+            modelId=bedrock_model,
+            messages=messages,
+            inferenceConfig={
+                'temperature': temperature,
+            },
+        )
+
+        # Extract response text robustly
+        output_text = ""
+        out = response.get('output') or {}
+        msg = out.get('message') or {}
+        content = msg.get('content') or []
+        if content and isinstance(content, list):
+            first = content[0]
+            if isinstance(first, dict):
+                output_text = first.get('text') or first.get('body') or ""
+
+        logger.info(
+            "Bedrock response received | elapsed_ms=%.2f response_chars=%s",
+            (time.perf_counter() - start) * 1000,
+            len(output_text or ""),
+        )
+
+        return (output_text or "").strip()
+
+    except Exception as e:
+        logger.warning("Bedrock call with %s failed: %s. Trying fallback model meta.llama3-8b-instruct-v1:0", bedrock_model, e)
         try:
             start = time.perf_counter()
-            bedrock_client = boto3.client(
-                'bedrock-runtime',
-                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-                region_name=os.getenv('AWS_REGION') or None,
-            )
-
-            messages = [{
-                "role": "user",
-                "content": [{"text": prompt}]
-            }]
-
             response = bedrock_client.converse(
-                modelId=bedrock_model,
+                modelId="meta.llama3-8b-instruct-v1:0",
                 messages=messages,
                 inferenceConfig={
                     'temperature': temperature,
                 },
             )
-
-            # Extract response text robustly
             output_text = ""
             out = response.get('output') or {}
             msg = out.get('message') or {}
@@ -110,39 +137,15 @@ def call_llm(
                     output_text = first.get('text') or first.get('body') or ""
 
             logger.info(
-                "Bedrock response received | elapsed_ms=%.2f response_chars=%s",
+                "Fallback Bedrock response received | elapsed_ms=%.2f response_chars=%s",
                 (time.perf_counter() - start) * 1000,
                 len(output_text or ""),
             )
 
             return (output_text or "").strip()
-        except Exception as e:
-            logger.exception("Bedrock call failed: %s", e)
-            raise RuntimeError(f'Bedrock call failed: {e}')
-
-    # Fallback to OpenAI
-    if OpenAI is None:
-        raise RuntimeError('openai package not installed and Bedrock not configured')
-    resolved_key = api_key or os.getenv('OPENAI_API_KEY')
-    if not resolved_key:
-        raise RuntimeError('OPENAI_API_KEY not set and no api_key provided')
-
-    logger.info("Using OpenAI backend | model=%s prompt_chars=%s", model, len(prompt))
-    start = time.perf_counter()
-    openai_client = OpenAI(api_key=resolved_key)
-    resp = openai_client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        timeout=timeout,
-    )
-    text = resp.choices[0].message.content
-    logger.info(
-        "OpenAI response received | elapsed_ms=%.2f response_chars=%s",
-        (time.perf_counter() - start) * 1000,
-        len(text or ""),
-    )
-    return text
+        except Exception as fallback_err:
+            logger.exception("Fallback Bedrock model meta.llama3-8b-instruct-v1:0 also failed: %s", fallback_err)
+            raise RuntimeError(f"Both Bedrock models failed: {fallback_err}")
 
 
 # =============================================================================
@@ -370,42 +373,67 @@ def call_llm_haiku(
     """
     Call an LLM to convert natural language to SQL.
     Preference order:
-      1. AWS Bedrock when `BEDROCK_HAIKU_MODEL_ID` is configured
-      2. OpenAI ChatCompletion when OpenAI API key is available
+      1. AWS Bedrock with primary model BEDROCK_HAIKU_MODEL_ID or 'anthropic.claude-3-haiku-20240307-v1:0'
+      2. Fallback to AWS Bedrock with 'meta.llama3-8b-instruct-v1:0'
     """
+    # Use Bedrock
+    bedrock_model = os.getenv('BEDROCK_HAIKU_MODEL_ID') or "anthropic.claude-3-haiku-20240307-v1:0"
+    
+    logger.info("Using AWS Bedrock backend | model=%s prompt_chars=%s", bedrock_model, len(prompt))
+    if boto3 is None:
+        raise RuntimeError('boto3 package not installed')
 
-    # Use Bedrock if configured via env var
-    bedrock_model = os.getenv('BEDROCK_HAIKU_MODEL_ID')
-    if bedrock_model:
-        # Avoid Opus on-demand ValidationException
-        #if bedrock_model == 'anthropic.claude-opus-4-8':
-        #    bedrock_model = 'anthropic.claude-3-haiku-20240307-v1:0'
-        logger.info("Using AWS Bedrock backend | model=%s prompt_chars=%s", bedrock_model, len(prompt))
-        if boto3 is None:
-            raise RuntimeError('boto3 package not installed')
+    try:
+        start = time.perf_counter()
+        bedrock_client = boto3.client(
+            'bedrock-runtime',
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+            region_name=os.getenv('AWS_REGION') or None,
+        )
+
+        messages = [{
+            "role": "user",
+            "content": [{"text": prompt}]
+        }]
+
+        response = bedrock_client.converse(
+            modelId=bedrock_model,
+            messages=messages,
+            inferenceConfig={
+                'temperature': temperature,
+            },
+        )
+
+        # Extract response text robustly
+        output_text = ""
+        out = response.get('output') or {}
+        msg = out.get('message') or {}
+        content = msg.get('content') or []
+        if content and isinstance(content, list):
+            first = content[0]
+            if isinstance(first, dict):
+                output_text = first.get('text') or first.get('body') or ""
+
+        logger.info(
+            "Bedrock response received | elapsed_ms=%.2f response_chars=%s",
+            (time.perf_counter() - start) * 1000,
+            len(output_text or ""),
+        )
+
+        return (output_text or "").strip()
+
+    except Exception as e:
+        logger.warning("Bedrock call with %s failed: %s. Trying fallback model meta.llama3-8b-instruct-v1:0", bedrock_model, e)
         try:
             start = time.perf_counter()
-            bedrock_client = boto3.client(
-                'bedrock-runtime',
-                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-                region_name=os.getenv('AWS_REGION') or None,
-            )
-
-            messages = [{
-                "role": "user",
-                "content": [{"text": prompt}]
-            }]
-
             response = bedrock_client.converse(
-                modelId=bedrock_model,
+                modelId="meta.llama3-8b-instruct-v1:0",
                 messages=messages,
                 inferenceConfig={
                     'temperature': temperature,
                 },
             )
-
-            # Extract response text robustly
             output_text = ""
             out = response.get('output') or {}
             msg = out.get('message') or {}
@@ -416,39 +444,15 @@ def call_llm_haiku(
                     output_text = first.get('text') or first.get('body') or ""
 
             logger.info(
-                "Bedrock response received | elapsed_ms=%.2f response_chars=%s",
+                "Fallback Bedrock response received | elapsed_ms=%.2f response_chars=%s",
                 (time.perf_counter() - start) * 1000,
                 len(output_text or ""),
             )
 
             return (output_text or "").strip()
-        except Exception as e:
-            logger.exception("Bedrock call failed: %s", e)
-            raise RuntimeError(f'Bedrock call failed: {e}')
-
-    # Fallback to OpenAI
-    if OpenAI is None:
-        raise RuntimeError('openai package not installed and Bedrock not configured')
-    resolved_key = api_key or os.getenv('OPENAI_API_KEY')
-    if not resolved_key:
-        raise RuntimeError('OPENAI_API_KEY not set and no api_key provided')
-
-    logger.info("Using OpenAI backend | model=%s prompt_chars=%s", model, len(prompt))
-    start = time.perf_counter()
-    openai_client = OpenAI(api_key=resolved_key)
-    resp = openai_client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        timeout=timeout,
-    )
-    text = resp.choices[0].message.content
-    logger.info(
-        "OpenAI response received | elapsed_ms=%.2f response_chars=%s",
-        (time.perf_counter() - start) * 1000,
-        len(text or ""),
-    )
-    return text
+        except Exception as fallback_err:
+            logger.exception("Fallback Bedrock model meta.llama3-8b-instruct-v1:0 also failed: %s", fallback_err)
+            raise RuntimeError(f"Both Bedrock models failed: {fallback_err}")
 
 
 def call_llm_haiku2(
@@ -462,40 +466,64 @@ def call_llm_haiku2(
     Generate dynamic textual and visual suggestions based on conversation history
     and the columns/data of the latest result DataFrame 
     """
+    # Use Bedrock
+    bedrock_model = os.getenv('BEDROCK_HAIKU_MODEL_ID') or "anthropic.claude-3-haiku-20240307-v1:0"
+    
+    logger.info("Using AWS Bedrock backend | model=%s prompt_chars=%s", bedrock_model, len(prompt))
+    if boto3 is None:
+        raise RuntimeError('boto3 package not installed')
 
-    # Use Bedrock if configured via env var
-    bedrock_model = os.getenv('BEDROCK_HAIKU_MODEL_ID')
-    logger.info("Using AWS haiku2 backend | model=%s prompt_chars=%s", bedrock_model, len(prompt)) 
-    if bedrock_model:
-        # Avoid Opus on-demand ValidationException
-        #if bedrock_model == 'anthropic.claude-opus-4-8':
-        #    bedrock_model = 'anthropic.claude-3-haiku-20240307-v1:0'
-        logger.info("Using AWS Bedrock backend | model=%s prompt_chars=%s", bedrock_model, len(prompt))
-        if boto3 is None:
-            raise RuntimeError('boto3 package not installed')
+    try:
+        start = time.perf_counter()
+        bedrock_client = boto3.client(
+            'bedrock-runtime',
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+            region_name=os.getenv('AWS_REGION') or None,
+        )
+
+        messages = [{
+            "role": "user",
+            "content": [{"text": prompt}]
+        }]
+
+        response = bedrock_client.converse(
+            modelId=bedrock_model,
+            messages=messages,
+            inferenceConfig={
+                'temperature': temperature,
+            },
+        )
+
+        # Extract response text robustly
+        output_text = ""
+        out = response.get('output') or {}
+        msg = out.get('message') or {}
+        content = msg.get('content') or []
+        if content and isinstance(content, list):
+            first = content[0]
+            if isinstance(first, dict):
+                output_text = first.get('text') or first.get('body') or ""
+
+        logger.info(
+            "Bedrock response received | elapsed_ms=%.2f response_chars=%s",
+            (time.perf_counter() - start) * 1000,
+            len(output_text or ""),
+        )
+
+        return (output_text or "").strip()
+
+    except Exception as e:
+        logger.warning("Bedrock call with %s failed: %s. Trying fallback model meta.llama3-8b-instruct-v1:0", bedrock_model, e)
         try:
             start = time.perf_counter()
-            bedrock_client = boto3.client(
-                'bedrock-runtime',
-                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-                region_name=os.getenv('AWS_REGION') or None,
-            )
-
-            messages = [{
-                "role": "user",
-                "content": [{"text": prompt}]
-            }]
-
             response = bedrock_client.converse(
-                modelId=bedrock_model,
+                modelId="meta.llama3-8b-instruct-v1:0",
                 messages=messages,
                 inferenceConfig={
                     'temperature': temperature,
                 },
             )
-
-            # Extract response text robustly
             output_text = ""
             out = response.get('output') or {}
             msg = out.get('message') or {}
@@ -506,36 +534,12 @@ def call_llm_haiku2(
                     output_text = first.get('text') or first.get('body') or ""
 
             logger.info(
-                "Bedrock response received | elapsed_ms=%.2f response_chars=%s",
+                "Fallback Bedrock response received | elapsed_ms=%.2f response_chars=%s",
                 (time.perf_counter() - start) * 1000,
                 len(output_text or ""),
             )
 
             return (output_text or "").strip()
-        except Exception as e:
-            logger.exception("Bedrock call failed: %s", e)
-            raise RuntimeError(f'Bedrock call failed: {e}')
-
-    # Fallback to OpenAI
-    if OpenAI is None:
-        raise RuntimeError('openai package not installed and Bedrock not configured')
-    resolved_key = api_key or os.getenv('OPENAI_API_KEY')
-    if not resolved_key:
-        raise RuntimeError('OPENAI_API_KEY not set and no api_key provided')
-
-    logger.info("Using OpenAI backend | model=%s prompt_chars=%s", model, len(prompt))
-    start = time.perf_counter()
-    openai_client = OpenAI(api_key=resolved_key)
-    resp = openai_client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        timeout=timeout,
-    )
-    text = resp.choices[0].message.content
-    logger.info(
-        "OpenAI response received | elapsed_ms=%.2f response_chars=%s",
-        (time.perf_counter() - start) * 1000,
-        len(text or ""),
-    )
-    return text
+        except Exception as fallback_err:
+            logger.exception("Fallback Bedrock model meta.llama3-8b-instruct-v1:0 also failed: %s", fallback_err)
+            raise RuntimeError(f"Both Bedrock models failed: {fallback_err}")
