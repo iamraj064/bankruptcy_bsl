@@ -64,9 +64,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# =============================================================================
-# PREMIUM STYLING (Slate & Blue Executive Theme + Sidebar Nav)
-# =============================================================================
 st.markdown(
     """
     <style>
@@ -279,10 +276,133 @@ st.markdown(
 # =============================================================================
 
 def get_actual_col(col_name, columns_set):
-    """Resolve database column name with case-insensitivity."""
+    """Resolve database column name with case-insensitivity and character mapping support."""
+    # First check exact or case-insensitive match
     for col in columns_set:
         if col.lower() == col_name.lower():
             return col
+            
+    # Then check mapping if the user calls using old names but we have clean names
+    old_to_new = {
+        "ac_no": "account_number",
+        "client": "client_name",
+        "open_date": "open_date",
+        "first_name": "first_name",
+        "middle_name": "middle_name",
+        "last_name": "last_name",
+        "ssn": "ssn",
+        "addl_1": "address_line_1",
+        "addl_2": "address_line_2",
+        "city": "city",
+        "state": "state",
+        "zipcode": "zipcode",
+        "record_type": "record_type",
+        "match_code": "match_code",
+        "match_score": "match_score",
+        "consumer_id": "consumer_id",
+        "consumer_type": "consumer_type",
+        "notification_no": "notification_number",
+        "notice_type": "notice_type",
+        "case_no": "case_number",
+        "chapter": "chapter",
+        "original chapter": "original_chapter",
+        "original_chapter": "original_chapter",
+        "date_filed": "date_filed",
+        "conversion_date": "conversion_date",
+        "status": "status",
+        "status_date": "status_date",
+        "pd_ssn": "pd_ssn",
+        "pd_first_name": "pd_first_name",
+        "pd_middle_name": "pd_middle_name",
+        "pd_lastt_name": "pd_last_name",
+        "pd_last_name": "pd_last_name",
+        "pd_suffix": "pd_suffix",
+        "pd_aka": "pd_aka",
+        "pd_aka2": "pd_aka2",
+        "pd_dba": "pd_dba",
+        "pd_dba2": "pd_dba2",
+        "pd_addl_1": "pd_address_line_1",
+        "pd_addl_2": "pd_address_line_2",
+        "pd_city": "pd_city",
+        "pd_state": "pd_state",
+        "pd_zipcode": "pd_zipcode",
+        "pd_phone": "pd_phone",
+        "sd_ssn": "sd_ssn",
+        "sd_first_name": "sd_first_name",
+        "sd_middle_name": "sd_middle_name",
+        "sd_lastt_name": "sd_last_name",
+        "sd_last_name": "sd_last_name",
+        "sd_suffix": "sd_suffix",
+        "sd_aka": "sd_aka",
+        "sd_aka2": "sd_aka2",
+        "sd_dba": "sd_dba",
+        "sd_dba2": "sd_dba2",
+        "sd_addl_1": "sd_address_line_1",
+        "sd_addl_2": "sd_address_line_2",
+        "sd_city": "sd_city",
+        "sd_state": "sd_state",
+        "sd_zipcode": "sd_zipcode",
+        "sd_phone": "sd_phone",
+        "judge_name": "judge_name",
+        "prose_indicator": "prose_indicator",
+        "attorny_ssn": "attorney_ssn",
+        "attorny_first_name": "attorney_first_name",
+        "attorny_middle_name": "attorney_middle_name",
+        "attorny_lastt_name": "attorney_last_name",
+        "attorny_suffix": "attorney_suffix",
+        "attorny_aka": "attorney_aka",
+        "attorny_aka2": "attorney_aka2",
+        "attorny_dba": "attorney_dba",
+        "attorny_dba2": "attorney_dba2",
+        "attorny_addl_1": "attorney_address_line_1",
+        "attorny_addl_2": "attorney_address_line_2",
+        "attorny_city": "attorney_city",
+        "attorny_state": "attorney_state",
+        "attorny_zipcode": "attorney_zipcode",
+        "attorny_phone": "attorney_phone",
+        "creditor_time": "creditor_meeting_time",
+        "creditor_meeting_time": "creditor_meeting_time",
+        "creditor_meeting_date": "creditor_meeting_date",
+        "creditor_addl_1": "creditor_address_line_1",
+        "creditor_addl_2": "creditor_address_line_2",
+        "creditor_city": "creditor_city",
+        "creditor_state": "creditor_state",
+        "creditor_zipcode": "creditor_zipcode",
+        "creditor_phone": "creditor_phone",
+        "trustee_name": "trustee_name",
+        "trustee_addl_1": "trustee_address_line_1",
+        "trustee_addl_2": "trustee_address_line_2",
+        "trustee_city": "trustee_city",
+        "trustee_state": "trustee_state",
+        "trustee_zipcode": "trustee_zipcode",
+        "trustee_phone": "trustee_phone",
+        "court_id": "court_id",
+        "court_district": "court_district",
+        "court_addl_1": "court_address_line_1",
+        "court_addl_2": "court_address_line_2",
+        "court_city": "court_city",
+        "court_state": "court_state",
+        "court_zipcode": "court_zipcode",
+        "court_phone": "court_phone",
+        "confirmation_date": "confirmation_date",
+        "asset_indicator": "asset_indicator",
+        "before_open": "before_open",
+        "sasf": "sasf",
+        "active_status": "active_status",
+        "disposition_text": "disposition_text",
+        "poc_bar_date": "poc_bar_date",
+    }
+    
+    # Try normalized matches
+    norm_col_name = col_name.lower().replace(" ", "_")
+    mapped_target = old_to_new.get(norm_col_name, norm_col_name)
+    
+    for col in columns_set:
+        norm_col = col.lower().replace(" ", "_")
+        mapped_col = old_to_new.get(norm_col, norm_col)
+        if mapped_col == mapped_target:
+            return col
+            
     return None
 
 
@@ -842,11 +962,11 @@ def get_legal_representation_insights(state_filter=None, chapter_filter=None, st
             )
 
         df_attorneys = pd.DataFrame()
-        attorney_cols = [c for c in ["Attorny_DBA", "Attorny_First_Name", "Attorny_lastt_Name"] if get_actual_col(c, columns)]
+        attorney_cols = [c for c in ["attorney_dba", "attorney_first_name", "attorney_last_name"] if get_actual_col(c, columns)]
         if len(attorney_cols) > 0:
-            att_dba = get_actual_col("Attorny_DBA", columns)
-            att_first = get_actual_col("Attorny_First_Name", columns)
-            att_last = get_actual_col("Attorny_lastt_Name", columns)
+            att_dba = get_actual_col("attorney_dba", columns)
+            att_first = get_actual_col("attorney_first_name", columns)
+            att_last = get_actual_col("attorney_last_name", columns)
             
             if att_dba and att_first and att_last:
                 name_expr = f"COALESCE(NULLIF({att_dba}, ''), {att_first} || ' ' || {att_last})"
@@ -1081,8 +1201,8 @@ def get_predictive_data():
         df_high_risk = pd.DataFrame()
         ac_col = get_actual_col("Ac_no", columns)
         if ac_col and score_col:
-            first = get_actual_col("First_name", columns) or get_actual_col("PD_First_Name", columns)
-            last = get_actual_col("Last_name", columns) or get_actual_col("PD_lastt_Name", columns)
+            first = get_actual_col("first_name", columns) or get_actual_col("pd_first_name", columns)
+            last = get_actual_col("last_name", columns) or get_actual_col("pd_last_name", columns)
             
             if first and last:
                 name_expr = f"{first} || ' ' || {last}"
@@ -1284,8 +1404,8 @@ def get_filtered_cases(state_filter=None, chapter_filter=None, status_filter=Non
         score_col = get_actual_col("match_score", columns) or "0"
         ac_col = get_actual_col("Ac_no", columns) or "Ac_no"
 
-        first = get_actual_col("First_name", columns) or get_actual_col("PD_First_Name", columns)
-        last = get_actual_col("Last_name", columns) or get_actual_col("PD_lastt_Name", columns)
+        first = get_actual_col("first_name", columns) or get_actual_col("pd_first_name", columns)
+        last = get_actual_col("last_name", columns) or get_actual_col("pd_last_name", columns)
         if first and last:
             name_expr = f"{first} || ' ' || {last}"
         else:
@@ -1407,9 +1527,9 @@ def get_trend_drilldown_insights(selected_year, state_filter=None, chapter_filte
             )
 
         df_attorneys = pd.DataFrame()
-        att_dba = get_actual_col("Attorny_DBA", columns)
-        att_first = get_actual_col("Attorny_First_Name", columns)
-        att_last = get_actual_col("Attorny_lastt_Name", columns)
+        att_dba = get_actual_col("attorney_dba", columns)
+        att_first = get_actual_col("attorney_first_name", columns)
+        att_last = get_actual_col("attorney_last_name", columns)
         if att_dba or att_last:
             name_expr = f"COALESCE(NULLIF({att_dba}, ''), {att_first} || ' ' || {att_last})" if att_first else f"COALESCE({att_dba}, '')"
             df_attorneys = pd.read_sql_query(
@@ -1510,15 +1630,7 @@ def main():
 
     # Initialize states
     if "data_in_db" not in st.session_state:
-        try:
-            conn = sqlite3.connect("data.db")
-            cursor = conn.cursor()
-            table_name = get_db_table_name()
-            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
-            st.session_state.data_in_db = cursor.fetchone() is not None
-            conn.close()
-        except Exception:
-            st.session_state.data_in_db = False
+        st.session_state.data_in_db = False
 
     if "last_uploaded_file_name" not in st.session_state:
         st.session_state.last_uploaded_file_name = None
@@ -1536,7 +1648,7 @@ def main():
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": " **Welcome to GenBI Assistant!** Ask me any natural language questions about the loaded filings data (e.g., *'Show cases filed in 2021'* or *'Plot a pie chart of cases chapter breakdown'*)."
+                "content": " **Welcome to GenBI Assistant!** "
             }
         ]
 
@@ -1767,7 +1879,6 @@ def main():
                 "end_date": _fc_end_date,
             }
 
-    # st.markdown('<div class="main-title"> Bankruptcy GenBI Assistant</div>', unsafe_allow_html=True)
     st.markdown('<div class="subtitle">Enterprise Bankruptcy & Risk Intelligence Dashboard</div>', unsafe_allow_html=True)
 
     # -----------------------------------------------------------------
@@ -1801,7 +1912,7 @@ def main():
                     else:
                         st.error("Failed to parse file. Ensure format is standard CSV.")
 
-        if st.session_state.data_in_db:
+        if st.session_state.last_uploaded_file_name is not None and st.session_state.data_in_db:
             try:
                 conn = sqlite3.connect("data.db")
                 table_name = get_db_table_name()
@@ -1833,8 +1944,6 @@ def main():
             except Exception as e:
                 logger.error(f"Error drawing data management cards: {e}")
                 st.session_state.data_in_db = False
-        else:
-            st.info("No active table detected. Please upload a CSV to populate database.")
 
     # -----------------------------------------------------------------
     # WORKSPACE: ANALYTICS (OPTIMIZED INTERACTIVE DRILL-DOWN & CASE INSPECTOR)
@@ -2353,8 +2462,8 @@ def main():
                             with det_col2:
                                 card_c1, card_c2 = st.columns(2)
                                 
-                                first_name_f = get_actual_col('First_name', case_row.keys()) or get_actual_col('PD_First_Name', case_row.keys())
-                                last_name_f = get_actual_col('Last_name', case_row.keys()) or get_actual_col('PD_lastt_Name', case_row.keys())
+                                first_name_f = get_actual_col('first_name', case_row.keys()) or get_actual_col('pd_first_name', case_row.keys())
+                                last_name_f = get_actual_col('last_name', case_row.keys()) or get_actual_col('pd_last_name', case_row.keys())
                                 state_f = get_actual_col('state', case_row.keys())
                                 city_f = get_actual_col('city', case_row.keys())
                                 ac_f = get_actual_col('Ac_no', case_row.keys())
@@ -2390,22 +2499,22 @@ def main():
                                     )
 
                                 with card_c2:
-                                    open_f = get_actual_col('Open_date', case_row.keys())
-                                    close_f = get_actual_col('Close_date', case_row.keys())
+                                    open_f = get_actual_col('open_date', case_row.keys())
+                                    status_date_f = get_actual_col('status_date', case_row.keys())
                                     st.markdown(
                                         f"""
                                         <div style="background-color: #f8fafc; border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
                                             <span style="font-size: 0.85rem; text-transform: uppercase; color: #64748b; font-weight: 600;">Timeline Coordinates</span>
                                             <h4 style="margin: 0.2rem 0; color: #1e293b;">Filing Chronology</h4>
                                             <p style="margin: 4px 0 0 0; font-size: 0.9rem;"><b>Open Date:</b> {case_row.get(open_f, 'N/A')}</p>
-                                            <p style="margin: 4px 0 0 0; font-size: 0.9rem;"><b>Close Date:</b> {case_row.get(close_f, 'N/A')}</p>
+                                            <p style="margin: 4px 0 0 0; font-size: 0.9rem;"><b>Status Date:</b> {case_row.get(status_date_f, 'N/A')}</p>
                                         </div>
                                         """,
                                         unsafe_allow_html=True
                                     )
                                     
-                                    client_f = get_actual_col('client', case_row.keys())
-                                    att_dba_f = get_actual_col('Attorny_DBA', case_row.keys())
+                                    client_f = get_actual_col('client_name', case_row.keys()) or get_actual_col('client', case_row.keys())
+                                    att_dba_f = get_actual_col('attorney_dba', case_row.keys())
                                     prose_f = get_actual_col('prose_indicator', case_row.keys())
                                     st.markdown(
                                         f"""
@@ -2566,7 +2675,7 @@ def main():
                         x=fcast_df["Month"], y=fcast_df["Ensemble Forecast"],
                         name="Ensemble Forecast",
                         mode="lines+markers",
-                        line=dict(color="#dc2626", width=2.5, dash="dash"),
+                        line=dict(color="#dc2626", width=2.5),
                         marker=dict(size=5, symbol="diamond", color="#dc2626"),
                         hovertemplate="%{x|%b %Y}  Forecast: <b>%{y:,.0f}</b><extra></extra>"
                     ))
@@ -2757,7 +2866,7 @@ def main():
                     fig_r.add_trace(go.Scatter(
                         x=df_risk_fc["Month"], y=df_risk_fc["Forecasted Avg Risk Score"],
                         name="Risk Forecast", mode="lines",
-                        line=dict(color="#dc2626", width=2, dash="dash"),
+                        line=dict(color="#dc2626", width=2),
                         hovertemplate="%{x|%b %Y}  Forecast: %{y:.1f}<extra></extra>"
                     ))
                     fig_r.add_vline(

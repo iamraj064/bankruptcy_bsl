@@ -1,290 +1,290 @@
 {
   "schema_version": "1.0",
-  "table_name": "bankruptcy4",
+  "table_name": "uploaded_data",
   "description": "Schema for bankruptcy4 and legal case record tracking, optimized for LLM retrieval.",
   "columns": [
     {
-      "name": "Ac_no",
+      "name": "account_number",
       "type": "string",
-      "description": "Account number associated with the record"
+      "description": "Debtor account number. A unique reference identifier for the financial account involved in the bankruptcy action."
     },
     {
-      "name": "client",
+      "name": "client_name",
       "type": "string",
-      "description": "Client name of the bankruptcy4 case"
+      "description": "The institution or creditor client associated with the bankruptcy case. Identifies the primary customer/client record."
     },
     {
-      "name": "Open_date",
+      "name": "open_date",
       "type": "date",
-      "description": "Date the account or case was opened , its in YYYY-MM-DD format"
+      "description": "The date on which the legal case or account tracking was initiated in the system. Formatted strictly as YYYY-MM-DD."
     },
     {
-      "name": "First_name",
+      "name": "first_name",
       "type": "string",
-      "description": "Primary consumer's first name"
+      "description": "The primary consumer/debtor's legal first name."
     },
     {
       "name": "middle_name",
       "type": "string",
-      "description": "Primary consumer's middle name"
+      "description": "The primary consumer/debtor's middle name or middle initial (if available)."
     },
     {
-      "name": "Last_name",
+      "name": "last_name",
       "type": "string",
-      "description": "Primary consumer's last name"
+      "description": "The primary consumer/debtor's legal last name."
     },
     {
       "name": "ssn",
       "type": "string",
-      "description": "Social Security Number of the primary consumer"
+      "description": "The Social Security Number of the primary consumer/debtor, formatted as a string."
     },
     {
-      "name": "Addl_1",
+      "name": "address_line_1",
       "type": "string",
-      "description": "Primary address line 1"
+      "description": "Primary consumer/debtor's street address line 1."
     },
     {
-      "name": "Addl_2",
+      "name": "address_line_2",
       "type": "string",
-      "description": "Primary address line 2 (Unit/Apt)"
+      "description": "Primary consumer/debtor's apartment, unit, suite, or additional address line 2."
     },
     {
-      "name": "City",
+      "name": "city",
       "type": "string",
-      "description": "Primary address city of the debtor"
+      "description": "The city of residence of the primary consumer/debtor."
     },
     {
-      "name": "State",
+      "name": "state",
       "type": "string",
-      "description": "Primary address state code"
+      "description": "The 2-letter standard US state abbreviation for the primary consumer/debtor's residence."
     },
     {
-      "name": "Zipcode",
+      "name": "zipcode",
       "type": "string",
-      "description": "Primary address postal code"
+      "description": "The postal zip code of the primary consumer/debtor's address."
     },
     {
       "name": "record_type",
       "type": "string",
-      "description": "Status classification of the record (values: New, Closed, Reopened, Update)"
+      "description": "Status category representing the current record stage. Allowed values: New, Closed, Reopened, Update."
     },
     {
       "name": "match_code",
       "type": "string",
-      "description": "Code indicating the quality of the record match"
+      "description": "Code indicating the quality of match (e.g. name, SSN, or address alignment)."
     },
     {
       "name": "match_score",
       "type": "integer",
-      "description": "Numerical score representing match confidence"
+      "description": "Confidence score representing the quality of matching, ranging from 0 (no match) to 100 (perfect match)."
     },
     {
       "name": "consumer_id",
       "type": "string",
-      "description": "Unique identifier for the consumer"
+      "description": "Unique system identifier for the primary consumer."
     },
     {
       "name": "consumer_type",
       "type": "string",
-      "description": "Type of consumer/debtor (values: Corporate, SME, Individual, Business, Partnership, Trust)"
+      "description": "The entity classification of the consumer. Allowed values: Corporate, SME, Individual, Business, Partnership, Trust."
     },
     {
-      "name": "notification_no",
+      "name": "notification_number",
       "type": "string",
-      "description": "Notification reference number for the case"
+      "description": "Reference number of the legal notification or case notice."
     },
     {
       "name": "notice_type",
       "type": "string",
-      "description": "Type of legal notice issued"
+      "description": "The classification/type of bankruptcy notice received (e.g. Chapter 7 filing notice)."
     },
     {
-      "name": "case_no",
+      "name": "case_number",
       "type": "string",
-      "description": "Legal/Court case number"
+      "description": "The court docket number assigned to the legal bankruptcy proceeding (e.g., 21-12345)."
     },
     {
       "name": "chapter",
       "type": "string",
-      "description": "bankruptcy4 chapter (e.g., 7, 11, 13)"
+      "description": "The specific chapter of the US Bankruptcy Code filed. Common chapters: 7, 11, 13."
     },
     {
-      "name": "original chapter",
+      "name": "original_chapter",
       "type": "string",
-      "description": "The initial bankruptcy chapter filed (with a space in column name)"
+      "description": "The initial chapter of the US Bankruptcy Code under which the case was first filed, before any subsequent conversion."
     },
     {
       "name": "date_filed",
       "type": "date",
-      "description": "Date the case was filed with the court in YYYY-MM-DD format"
+      "description": "The date the bankruptcy case was officially filed with the US bankruptcy court. Formatted strictly as YYYY-MM-DD."
     },
     {
       "name": "conversion_date",
       "type": "date",
-      "description": "Date the case was converted to a different chapter in YYYY-MM-DD format"
+      "description": "The date the bankruptcy case was converted from the original chapter to a new chapter. Formatted strictly as YYYY-MM-DD."
     },
     {
       "name": "status",
       "type": "string",
-      "description": "Current status of the case"
+      "description": "The current legal status of the case. Allowed values (case-sensitive): Active, Closed, Discharged, Dismissed, Converted, Pending."
     },
     {
-      "name": "Status_date",
+      "name": "status_date",
       "type": "date",
-      "description": "Date of the last status update in YYYY-MM-DD format"
+      "description": "The date when the current status was updated or finalized. Formatted strictly as YYYY-MM-DD."
     },
     {
-      "name": "PD_ssn",
+      "name": "pd_ssn",
       "type": "string",
-      "description": "Primary Debtor SSN"
+      "description": "Primary Debtor Social Security Number (SSN)."
     },
     {
-      "name": "PD_First_Name",
+      "name": "pd_first_name",
       "type": "string",
-      "description": "Primary Debtor First Name"
+      "description": "Primary Debtor first name."
     },
     {
-      "name": "PD_middle_Name",
+      "name": "pd_middle_name",
       "type": "string",
-      "description": "Primary Debtor Middle Name"
+      "description": "Primary Debtor details - Middle Name. Extracted legal entity information."
     },
     {
-      "name": "PD_lastt_Name",
+      "name": "pd_last_name",
       "type": "string",
-      "description": "Primary Debtor Last Name"
+      "description": "Primary Debtor last name."
     },
     {
-      "name": "PD_suffix",
+      "name": "pd_suffix",
       "type": "string",
-      "description": "Primary Debtor Suffix (Jr, Sr, III)"
+      "description": "Primary Debtor details - Suffix. Extracted legal entity information."
     },
     {
-      "name": "PD_AKA",
+      "name": "pd_aka",
       "type": "string",
-      "description": "Primary Debtor Alias 1"
+      "description": "Primary Debtor details - Aka. Extracted legal entity information."
     },
     {
-      "name": "PD_AKA2",
+      "name": "pd_aka2",
       "type": "string",
-      "description": "Primary Debtor Alias 2"
+      "description": "Primary Debtor details - Aka2. Extracted legal entity information."
     },
     {
-      "name": "PD_DBA",
+      "name": "pd_dba",
       "type": "string",
-      "description": "Primary Debtor Doing Business As name 1"
+      "description": "Primary Debtor details - Dba. Extracted legal entity information."
     },
     {
-      "name": "PD_DBA2",
+      "name": "pd_dba2",
       "type": "string",
-      "description": "Primary Debtor Doing Business As name 2"
+      "description": "Primary Debtor details - Dba2. Extracted legal entity information."
     },
     {
-      "name": "PD_Addl_1",
+      "name": "pd_address_line_1",
       "type": "string",
-      "description": "Primary Debtor Address Line 1"
+      "description": "Primary Debtor details - Address Line 1. Extracted legal entity information."
     },
     {
-      "name": "PD_Addl_2",
+      "name": "pd_address_line_2",
       "type": "string",
-      "description": "Primary Debtor Address Line 2"
+      "description": "Primary Debtor details - Address Line 2. Extracted legal entity information."
     },
     {
-      "name": "PD_City",
+      "name": "pd_city",
       "type": "string",
-      "description": "Primary Debtor City"
+      "description": "Primary Debtor details - City. Extracted legal entity information."
     },
     {
-      "name": "PD_State",
+      "name": "pd_state",
       "type": "string",
-      "description": "Primary Debtor State"
+      "description": "Primary Debtor details - State. Extracted legal entity information."
     },
     {
-      "name": "PD_Zipcode",
+      "name": "pd_zipcode",
       "type": "string",
-      "description": "Primary Debtor Zipcode"
+      "description": "Primary Debtor details - Zipcode. Extracted legal entity information."
     },
     {
-      "name": "PD_phone",
+      "name": "pd_phone",
       "type": "string",
-      "description": "Primary Debtor Phone Number"
+      "description": "Primary Debtor contact phone number."
     },
     {
-      "name": "SD_ssn",
+      "name": "sd_ssn",
       "type": "string",
-      "description": "Secondary Debtor SSN"
+      "description": "Secondary Debtor Social Security Number (SSN)."
     },
     {
-      "name": "SD_First_Name",
+      "name": "sd_first_name",
       "type": "string",
-      "description": "Secondary Debtor First Name"
+      "description": "Secondary Debtor first name."
     },
     {
-      "name": "SD_middle_Name",
+      "name": "sd_middle_name",
       "type": "string",
-      "description": "Secondary Debtor Middle Name"
+      "description": "Secondary Debtor details - Middle Name. Extracted legal entity information."
     },
     {
-      "name": "SD_lastt_Name",
+      "name": "sd_last_name",
       "type": "string",
-      "description": "Secondary Debtor Last Name"
+      "description": "Secondary Debtor last name."
     },
     {
-      "name": "SD_suffix",
+      "name": "sd_suffix",
       "type": "string",
-      "description": "Secondary Debtor Suffix"
+      "description": "Secondary Debtor details - Suffix. Extracted legal entity information."
     },
     {
-      "name": "SD_AKA",
+      "name": "sd_aka",
       "type": "string",
-      "description": "Secondary Debtor Alias 1"
+      "description": "Secondary Debtor details - Aka. Extracted legal entity information."
     },
     {
-      "name": "SD_AKA2",
+      "name": "sd_aka2",
       "type": "string",
-      "description": "Secondary Debtor Alias 2"
+      "description": "Secondary Debtor details - Aka2. Extracted legal entity information."
     },
     {
-      "name": "SD_DBA",
+      "name": "sd_dba",
       "type": "string",
-      "description": "Secondary Debtor Doing Business As 1"
+      "description": "Secondary Debtor details - Dba. Extracted legal entity information."
     },
     {
-      "name": "SD_DBA2",
+      "name": "sd_dba2",
       "type": "string",
-      "description": "Secondary Debtor Doing Business As 2"
+      "description": "Secondary Debtor details - Dba2. Extracted legal entity information."
     },
     {
-      "name": "SD_Addl_1",
+      "name": "sd_address_line_1",
       "type": "string",
-      "description": "Secondary Debtor Address Line 1"
+      "description": "Secondary Debtor details - Address Line 1. Extracted legal entity information."
     },
     {
-      "name": "SD_Addl_2",
+      "name": "sd_address_line_2",
       "type": "string",
-      "description": "Secondary Debtor Address Line 2"
+      "description": "Secondary Debtor details - Address Line 2. Extracted legal entity information."
     },
     {
-      "name": "SD_City",
+      "name": "sd_city",
       "type": "string",
-      "description": "Secondary Debtor City"
+      "description": "Secondary Debtor details - City. Extracted legal entity information."
     },
     {
-      "name": "SD_State",
+      "name": "sd_state",
       "type": "string",
-      "description": "Secondary Debtor State"
+      "description": "Secondary Debtor details - State. Extracted legal entity information."
     },
     {
-      "name": "SD_Zipcode",
+      "name": "sd_zipcode",
       "type": "string",
-      "description": "Secondary Debtor Zipcode"
+      "description": "Secondary Debtor details - Zipcode. Extracted legal entity information."
     },
     {
-      "name": "SD_phone",
+      "name": "sd_phone",
       "type": "string",
-      "description": "Secondary Debtor Phone Number"
+      "description": "Secondary Debtor contact phone number."
     },
     {
-      "name": "Judge_name",
+      "name": "judge_name",
       "type": "string",
       "description": "Name of the presiding judge"
     },
@@ -294,189 +294,189 @@
       "description": "Indicates if the party is representing themselves"
     },
     {
-      "name": "Attorny_ssn",
+      "name": "attorney_ssn",
       "type": "string",
-      "description": "Attorney Identification/SSN"
+      "description": "Attorney/Counsel details - Ssn. Legal representation info."
     },
     {
-      "name": "Attorny_First_Name",
+      "name": "attorney_first_name",
       "type": "string",
-      "description": "Attorney First Name"
+      "description": "Attorney's legal first name."
     },
     {
-      "name": "Attorny_middle_Name",
+      "name": "attorney_middle_name",
       "type": "string",
-      "description": "Attorney Middle Name"
+      "description": "Attorney/Counsel details - Middle Name. Legal representation info."
     },
     {
-      "name": "Attorny_lastt_Name",
+      "name": "attorney_last_name",
       "type": "string",
-      "description": "Attorney Last Name"
+      "description": "Attorney's legal last name."
     },
     {
-      "name": "Attorny_suffix",
+      "name": "attorney_suffix",
       "type": "string",
-      "description": "Attorney Suffix"
+      "description": "Attorney/Counsel details - Suffix. Legal representation info."
     },
     {
-      "name": "Attorny_AKA",
+      "name": "attorney_aka",
       "type": "string",
-      "description": "Attorney Alias"
+      "description": "Attorney/Counsel details - Aka. Legal representation info."
     },
     {
-      "name": "Attorny_AKA2",
+      "name": "attorney_aka2",
       "type": "string",
-      "description": "Attorney Alias 2"
+      "description": "Attorney/Counsel details - Aka2. Legal representation info."
     },
     {
-      "name": "Attorny_DBA",
+      "name": "attorney_dba",
       "type": "string",
-      "description": "Attorney Firm/DBA"
+      "description": "Attorney's Doing Business As (DBA) name or Law Firm name."
     },
     {
-      "name": "Attorny_DBA2",
+      "name": "attorney_dba2",
       "type": "string",
-      "description": "Attorney Firm/DBA 2"
+      "description": "Attorney's Doing Business As (DBA) name or Law Firm name."
     },
     {
-      "name": "Attorny_Addl_1",
+      "name": "attorney_address_line_1",
       "type": "string",
-      "description": "Attorney Address Line 1"
+      "description": "Attorney/Counsel details - Address Line 1. Legal representation info."
     },
     {
-      "name": "Attorny_Addl_2",
+      "name": "attorney_address_line_2",
       "type": "string",
-      "description": "Attorney Address Line 2"
+      "description": "Attorney/Counsel details - Address Line 2. Legal representation info."
     },
     {
-      "name": "Attorny_City",
+      "name": "attorney_city",
       "type": "string",
-      "description": "Attorney City"
+      "description": "Attorney/Counsel details - City. Legal representation info."
     },
     {
-      "name": "Attorny_State",
+      "name": "attorney_state",
       "type": "string",
-      "description": "Attorney State"
+      "description": "Attorney/Counsel details - State. Legal representation info."
     },
     {
-      "name": "Attorny_Zipcode",
+      "name": "attorney_zipcode",
       "type": "string",
-      "description": "Attorney Zipcode"
+      "description": "Attorney/Counsel details - Zipcode. Legal representation info."
     },
     {
-      "name": "Attorny_phone",
+      "name": "attorney_phone",
       "type": "string",
-      "description": "Attorney Phone Number"
+      "description": "Attorney/Counsel details - Phone. Legal representation info."
     },
     {
-      "name": "creditor_time",
+      "name": "creditor_meeting_time",
       "type": "string",
-      "description": "Meeting of Creditors (341) scheduled time"
+      "description": "Section 341 Meeting of Creditors scheduling details: Meeting of Creditors (341) scheduled time"
     },
     {
-      "name": "creditor_Addl_1",
+      "name": "creditor_address_line_1",
       "type": "string",
-      "description": "341 Meeting Address Line 1"
+      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting Address Line 1"
     },
     {
-      "name": "creditor_Addl_2",
+      "name": "creditor_address_line_2",
       "type": "string",
-      "description": "341 Meeting Address Line 2"
+      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting Address Line 2"
     },
     {
-      "name": "creditor_City",
+      "name": "creditor_city",
       "type": "string",
-      "description": "City where the 341 Meeting of Creditors is scheduled (e.g. Chicago)"
+      "description": "Section 341 Meeting of Creditors scheduling details: City where the 341 Meeting of Creditors is scheduled (e.g. Chicago)"
     },
     {
-      "name": "creditor_State",
+      "name": "creditor_state",
       "type": "string",
-      "description": "341 Meeting State"
+      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting State"
     },
     {
-      "name": "creditor_Zipcode",
+      "name": "creditor_zipcode",
       "type": "string",
-      "description": "341 Meeting Zipcode"
+      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting Zipcode"
     },
     {
       "name": "creditor_phone",
       "type": "string",
-      "description": "341 Meeting contact phone"
+      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting contact phone"
     },
     {
       "name": "trustee_name",
       "type": "string",
-      "description": "Name of the appointed trustee"
+      "description": "Appointed case Trustee details: Name of the appointed trustee"
     },
     {
-      "name": "Trustee_Addl_1",
+      "name": "trustee_address_line_1",
       "type": "string",
-      "description": "Trustee Address Line 1"
+      "description": "Appointed case Trustee details: Trustee Address Line 1"
     },
     {
-      "name": "Trustee_Addl_2",
+      "name": "trustee_address_line_2",
       "type": "string",
-      "description": "Trustee Address Line 2"
+      "description": "Appointed case Trustee details: Trustee Address Line 2"
     },
     {
-      "name": "Trustee_City",
+      "name": "trustee_city",
       "type": "string",
-      "description": "Trustee City"
+      "description": "Appointed case Trustee details: Trustee City"
     },
     {
-      "name": "Trustee_State",
+      "name": "trustee_state",
       "type": "string",
-      "description": "Trustee State"
+      "description": "Appointed case Trustee details: Trustee State"
     },
     {
-      "name": "Trustee_Zipcode",
+      "name": "trustee_zipcode",
       "type": "string",
-      "description": "Trustee Zipcode"
+      "description": "Appointed case Trustee details: Trustee Zipcode"
     },
     {
-      "name": "Trustee_phone",
+      "name": "trustee_phone",
       "type": "string",
-      "description": "Trustee Phone Number"
+      "description": "Appointed case Trustee details: Trustee Phone Number"
     },
     {
-      "name": "Court_id",
+      "name": "court_id",
       "type": "string",
-      "description": "Identifier for the specific court"
+      "description": "Jurisdiction Court details: Identifier for the specific court"
     },
     {
       "name": "court_district",
       "type": "string",
-      "description": "Court district jurisdiction"
+      "description": "Jurisdiction Court details: Court district jurisdiction"
     },
     {
-      "name": "Court_Addl_1",
+      "name": "court_address_line_1",
       "type": "string",
-      "description": "Court Address Line 1"
+      "description": "Jurisdiction Court details: Court Address Line 1"
     },
     {
-      "name": "Court_Addl_2",
+      "name": "court_address_line_2",
       "type": "string",
-      "description": "Court Address Line 2"
+      "description": "Jurisdiction Court details: Court Address Line 2"
     },
     {
-      "name": "Court_City",
+      "name": "court_city",
       "type": "string",
-      "description": "Court City"
+      "description": "Jurisdiction Court details: Court City"
     },
     {
-      "name": "Court_State",
+      "name": "court_state",
       "type": "string",
-      "description": "Court State"
+      "description": "Jurisdiction Court details: Court State"
     },
     {
-      "name": "Court_Zipcode",
+      "name": "court_zipcode",
       "type": "string",
-      "description": "Court Zipcode"
+      "description": "Jurisdiction Court details: Court Zipcode"
     },
     {
-      "name": "Court_phone",
+      "name": "court_phone",
       "type": "string",
-      "description": "Court Phone Number"
+      "description": "Jurisdiction Court details: Court Phone Number"
     },
     {
       "name": "confirmation_date",
@@ -484,32 +484,32 @@
       "description": "Date the plan was confirmed in YYYY-MM-DD format"
     },
     {
-      "name": "Asset_indicator",
+      "name": "asset_indicator",
       "type": "boolean",
       "description": "Indicates if the case involves assets"
     },
     {
-      "name": "Before_open",
+      "name": "before_open",
       "type": "string",
       "description": "Indicator of status prior to opening"
     },
     {
-      "name": "SASF",
+      "name": "sasf",
       "type": "string",
       "description": "Internal record flag/identifier"
     },
     {
-      "name": "Active_Status",
+      "name": "active_status",
       "type": "string",
       "description": "Current active/inactive status flag"
     },
     {
-      "name": "Disposition_text",
+      "name": "disposition_text",
       "type": "string",
       "description": "Final result or judgment description"
     },
     {
-      "name": "POC_bar_date",
+      "name": "poc_bar_date",
       "type": "date",
       "description": "Proof of Claim (POC) bar date in YYYY-MM-DD format"
     }

@@ -8,6 +8,7 @@ try:
     import boto3
 except ImportError:
     boto3 = None
+import datetime
 try:
     from openai import OpenAI
 except ImportError:
@@ -70,6 +71,9 @@ def call_llm(
     # Use Bedrock if configured via env var
     bedrock_model = os.getenv('BEDROCK_MODEL_ID')
     if bedrock_model:
+        # Override to Claude 3 Haiku for superior SQL generation reasoning, and avoid Opus on-demand failure
+        if bedrock_model in ['meta.llama3-8b-instruct-v1:0', 'anthropic.claude-opus-4-8']:
+            bedrock_model = 'anthropic.claude-3-haiku-20240307-v1:0'
         logger.info("Using AWS Bedrock backend | model=%s prompt_chars=%s", bedrock_model, len(prompt))
         if boto3 is None:
             raise RuntimeError('boto3 package not installed')
@@ -209,7 +213,7 @@ def initialize_local_prompt_cache():
         return False
 
 
-def _get_cached_prompt(prompt: str, model: str, temperature: float):
+def _get_cached_prompt(prompt: str, model: str, temperature: float, ttl_seconds: int = 86400):
     if not initialize_local_prompt_cache() or _local_cache_db is None:
         return None
 
@@ -217,13 +221,27 @@ def _get_cached_prompt(prompt: str, model: str, temperature: float):
         prompt_hash = hashlib.sha256(f"{model}|{temperature}|{prompt}".encode("utf-8")).hexdigest()
         cursor = _local_cache_db.cursor()
         cursor.execute(
-            "SELECT response FROM prompt_cache WHERE prompt_hash = ?",
+            "SELECT response, created_at FROM prompt_cache WHERE prompt_hash = ?",
             (prompt_hash,)
         )
         row = cursor.fetchone()
         if row:
-            logger.info("Local prompt cache hit | model=%s prompt_hash=%s", model, prompt_hash)
-            return row[0]
+            response_text, created_at_str = row
+            try:
+                # created_at is in YYYY-MM-DD HH:MM:SS format
+                created_time = datetime.datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
+                now_utc = datetime.datetime.utcnow()
+                age_seconds = (now_utc - created_time).total_seconds()
+                if age_seconds < ttl_seconds:
+                    logger.info("Local prompt cache hit | model=%s prompt_hash=%s | age_sec=%.1f", model, prompt_hash, age_seconds)
+                    return response_text
+                else:
+                    logger.info("Local prompt cache entry expired | model=%s prompt_hash=%s | age_sec=%.1f", model, prompt_hash, age_seconds)
+                    cursor.execute("DELETE FROM prompt_cache WHERE prompt_hash = ?", (prompt_hash,))
+                    _local_cache_db.commit()
+            except Exception as ex:
+                logger.warning("Cache TTL parsing failed, returning cached value: %s", ex)
+                return response_text
     except Exception as e:
         logger.exception("Failed to read from local prompt cache: %s", e)
     return None
@@ -344,10 +362,10 @@ if LANGCHAIN_AVAILABLE:
 
 def call_llm_haiku(
     prompt: str,
-    model: str = 'anthropic.claude-3-haiku-20240307-v1:0',
+    model: str="anthropic.claude-3-haiku-20240307-v1:0",
     api_key: str = None,
     timeout: int = 60,
-    temperature: float = 0.1,
+    temperature: float = 0,
 ) -> str:
     """
     Call an LLM to convert natural language to SQL.
@@ -359,6 +377,9 @@ def call_llm_haiku(
     # Use Bedrock if configured via env var
     bedrock_model = os.getenv('BEDROCK_HAIKU_MODEL_ID')
     if bedrock_model:
+        # Avoid Opus on-demand ValidationException
+        #if bedrock_model == 'anthropic.claude-opus-4-8':
+        #    bedrock_model = 'anthropic.claude-3-haiku-20240307-v1:0'
         logger.info("Using AWS Bedrock backend | model=%s prompt_chars=%s", bedrock_model, len(prompt))
         if boto3 is None:
             raise RuntimeError('boto3 package not installed')
@@ -413,6 +434,90 @@ def call_llm_haiku(
         raise RuntimeError('OPENAI_API_KEY not set and no api_key provided')
 
     logger.info("Using OpenAI backend | model=%s prompt_chars=%s", model, len(prompt))
+    start = time.perf_counter()
+    openai_client = OpenAI(api_key=resolved_key)
+    resp = openai_client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        timeout=timeout,
+    )
+    text = resp.choices[0].message.content
+    logger.info(
+        "OpenAI response received | elapsed_ms=%.2f response_chars=%s",
+        (time.perf_counter() - start) * 1000,
+        len(text or ""),
+    )
+    return text
+
+
+def call_llm_haiku2(
+    prompt: str,
+    model: str="anthropic.claude-3-haiku-20240307-v1:0",
+    api_key: str = None,
+    timeout: int = 60,
+    temperature: float = 0.7,
+) -> str:
+    """
+    Generate dynamic textual and visual suggestions based on conversation history
+    and the columns/data of the latest result DataFrame 
+    """
+
+    # Use Bedrock if configured via env var
+    bedrock_model = os.getenv('BEDROCK_HAIKU_MODEL_ID')
+    if bedrock_model:
+        # Avoid Opus on-demand ValidationException
+        #if bedrock_model == 'anthropic.claude-opus-4-8':
+        #    bedrock_model = 'anthropic.claude-3-haiku-20240307-v1:0'
+        logger.info("Using AWS Bedrock backend | model=%s prompt_chars=%s", bedrock_model, len(prompt))
+        if boto3 is None:
+            raise RuntimeError('boto3 package not installed')
+        try:
+            start = time.perf_counter()
+            bedrock_client = boto3.client(
+                'bedrock-runtime',
+                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+                region_name=os.getenv('AWS_REGION') or None,
+            )
+
+            messages = [{
+                "role": "user",
+                "content": [{"text": prompt}]
+            }]
+
+            response = bedrock_client.converse(
+                modelId=bedrock_model,
+                messages=messages,
+                inferenceConfig={
+                    'temperature': temperature,
+                },
+            )
+
+            # Extract response text robustly
+            output_text = ""
+            out = response.get('output') or {}
+            msg = out.get('message') or {}
+            content = msg.get('content') or []
+            if content and isinstance(content, list):
+                first = content[0]
+                if isinstance(first, dict):
+                    output_text = first.get('text') or first.get('body') or ""
+
+            logger.info(
+                "Bedrock response received | elapsed_ms=%.2f response_chars=%s",
+                (time.perf_counter() - start) * 1000,
+                len(output_text or ""),
+            )
+
+            return (output_text or "").strip()
+        except Exception as e:
+            logger.exception("Bedrock call failed: %s", e)
+            raise RuntimeError(f'Bedrock call failed: {e}')
+
+    # Fallback to OpenAI
+
+    logger.info("Using Anthropic backend | model=%s prompt_chars=%s", model, len(prompt))
     start = time.perf_counter()
     openai_client = OpenAI(api_key=resolved_key)
     resp = openai_client.chat.completions.create(

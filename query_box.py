@@ -7,20 +7,14 @@ import hashlib
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-from config import call_llm, call_llm_haiku, call_llm_with_cache, count_token_usage
+from config import call_llm, call_llm_haiku, call_llm_haiku2, call_llm_with_cache, count_token_usage
 from dotenv import load_dotenv
 from insights_generator import generate_insights
 
-# =============================================================================
-# CONFIG & INITIALIZATION
-# =============================================================================
 load_dotenv()
 
 logger = logging.getLogger("bankruptcy_genbi")
 
-# =============================================================================
-# SCHEMA UTILITY & FORMATTING
-# =============================================================================
 
 def to_bold_unicode(text):
     """Convert typical alphanumeric characters into mathematical bold characters to enforce formatting."""
@@ -59,103 +53,324 @@ def load_schema():
         return None
 
 
-def _generate_dynamic_prompt_suggestions(schema, conversation_memory):
-    """Generate dynamic textual and visual suggestions based on conversation history using Claude Haiku."""
+def clean_and_validate_suggestions(data, schema):
+    """Post-process and validate suggestions to ensure they strictly conform to user rules."""
+    visual_kws = ["show", "draw", "display", "plot", "chart", "graph", "visualize", "visualise", "breakdown", "distribution", "trend", "trends", "view", "pie", "bar", "line", "donut", "histogram", "heatmap", "scatter", "area"]
+    
+    textual = []
+    visual = []
+    
+    # Extract raw suggestions
+    raw_textual = data.get("textual", []) if isinstance(data, dict) else []
+    raw_visual = data.get("visual", []) if isinstance(data, dict) else []
+    
+    # 1. Process textual suggestions: remove visual words or drop them
+    for q in raw_textual:
+        q_str = str(q).strip()
+        if not q_str or len(q_str) < 5:
+            continue
+        q_lower = q_str.lower()
+        
+        # Check if it has any visual keyword
+        has_visual_kw = any(re.search(rf"\b{kw}\b", q_lower) for kw in visual_kws)
+        if has_visual_kw:
+            # Try to rewrite it by replacing the visual action verb at the start
+            cleaned_q = q_str
+            cleaned_q = re.sub(r"^(show|display|draw|view|plot|visualize|visualise)\b", "", cleaned_q, flags=re.IGNORECASE).strip()
+            q_lower_new = cleaned_q.lower()
+            if any(re.search(rf"\b{kw}\b", q_lower_new) for kw in visual_kws):
+                continue # discard it
+            else:
+                # Rewrite leading question prefix
+                if cleaned_q:
+                    cleaned_q = cleaned_q[0].upper() + cleaned_q[1:]
+                    if not cleaned_q.startswith(("What", "How", "List", "Filter", "Find", "Identify", "Calculate", "Compare")):
+                        cleaned_q = "What is the " + cleaned_q.lower()
+                    if not cleaned_q.endswith("?"):
+                        cleaned_q += "?"
+                    textual.append(cleaned_q)
+        else:
+            textual.append(q_str)
+            
+    # 2. Process visual suggestions: ensure they contain at least one visual keyword
+    for q in raw_visual:
+        q_str = str(q).strip()
+        if not q_str or len(q_str) < 5:
+            continue
+        q_lower = q_str.lower()
+        
+        has_visual_kw = any(re.search(rf"\b{kw}\b", q_lower) for kw in visual_kws)
+        if not has_visual_kw:
+            # Prepend a default chart verb
+            q_str = "Show " + q_str[0].lower() + q_str[1:]
+        visual.append(q_str)
+        
+    # Deduplicate
+    textual = list(dict.fromkeys(textual))
+    visual = list(dict.fromkeys(visual))
+    
+    # 3. Formulate fallback lists for padding
+    fallback_textual = [
+        "What is the total number of cases?",
+        "Filter cases by Chapter 7 filings",
+        "Identify the top 10 states by case volume",
+        "List the most recent 10 records in the dataset",
+        "Calculate the average match score for all records",
+        "Find records where state is NY",
+        "How many active cases are registered?",
+        "Compare count of active vs closed status cases"
+    ]
+    # Filter fallbacks just in case
+    fallback_textual = [f for f in fallback_textual if not any(re.search(rf"\b{kw}\b", f.lower()) for kw in visual_kws)]
+    
+    fallback_visual = [
+        "Pie chart of chapter breakdown",
+        "Bar chart of cases by state",
+        "Line chart of filings over time",
+        "Horizontal bar chart of top 10 attorneys",
+        "Donut chart of case status",
+        "Histogram of match scores"
+    ]
+    
+    # Pad textual to 4
+    for item in fallback_textual:
+        if len(textual) >= 4:
+            break
+        if item not in textual:
+            textual.append(item)
+            
+    # Pad visual to 4
+    for item in fallback_visual:
+        if len(visual) >= 4:
+            break
+        if item not in visual:
+            visual.append(item)
+            
+    return {
+        "textual": textual[:4],
+        "visual": visual[:4]
+    }
+
+
+def _generate_dynamic_prompt_suggestions(schema, conversation_memory, last_result_df=None):
+    """Generate dynamic textual and visual suggestions based on conversation history
+    and the columns/data of the latest result DataFrame."""
     try:
-        # If no conversation history, return fallback suggestions
-        if not conversation_memory or not conversation_memory.get("history"):
-            return {
-                "textual": [
-                    "How many total bankruptcy filings are there?",
-                    "What are the top 5 states with the most filings?"
-                ],
-                "visual": [
-                    "Show a pie chart of chapter distribution",
-                    "Bar chart of filings count by state"
-                ]
-            }
+        # Build result context if we have a recent DataFrame
+        result_context = ""
+        if last_result_df is not None and not last_result_df.empty:
+            num_cols = last_result_df.select_dtypes(include='number').columns.tolist()
+            cat_cols = [c for c in last_result_df.columns if c not in num_cols]
+            sample_rows = last_result_df.head(3).to_dict('records')
+            result_context = (
+                f"\nLAST QUERY RESULT SUMMARY:\n"
+                f"- Rows returned: {len(last_result_df)}\n"
+                f"- Numeric columns: {num_cols or 'none'}\n"
+                f"- Categorical columns: {cat_cols or 'none'}\n"
+                f"- Sample data: {sample_rows}\n"
+            )
 
         # Format memory
-        history = conversation_memory["history"]
-        recent = history[-3:]
         history_lines = []
-        for entry in recent:
-            history_lines.append(f"User: {entry.get('user_question')}")
-            if entry.get('sql_query'):
-                history_lines.append(f"SQL: {entry.get('sql_query')}")
-            if entry.get('record_count') is not None:
-                history_lines.append(f"Result count: {entry.get('record_count')} rows")
-        history_str = "\n".join(history_lines)
+        last_question_context = ""
+        if conversation_memory and conversation_memory.get("history"):
+            history = conversation_memory["history"]
+            recent = history[-3:]
+            for entry in recent:
+                history_lines.append(f"User: {entry.get('user_question')}")
+                if entry.get('sql_query'):
+                    history_lines.append(f"SQL: {entry.get('sql_query')}")
+                if entry.get('record_count') is not None:
+                    history_lines.append(f"Result count: {entry.get('record_count')} rows")
+            
+            # Extract previous question for context
+            last_q = history[-1].get("user_question")
+            if last_q:
+                last_question_context = (
+                    f"CURRENT USER QUERY / LAST USER QUESTION: \"{last_q}\"\n"
+                    f"CRITICAL REQUIREMENT:\n"
+                    f"The textual suggestions MUST be a few logical follow-up questions based on the current query ('{last_q}'). "
+                    f"For example, if the current query is about states and chapters, follow up on those specific states or chapters "
+                    f"(e.g., 'What is the percentage of Chapter 7 in the top state?' or 'Compare Chapter 13 cases across those states'). "
+                    f"Make the suggested questions feel like a natural continuation of the user's analytical journey, drilling deeper "
+                    f"into the categories, filters, or time periods from the current query and its results.\n\n"
+                )
+        
+        if history_lines:
+            history_str = "Recent Conversation:\n" + "\n".join(history_lines)
+        else:
+            history_str = "Recent Conversation:\n(No queries asked yet. This is the start of the user's journey.)"
+
 
         prompt = (
-            "You are an AI assistant designed to suggest the next queries/visualizations for a bankruptcy dataset dashboard.\n"
-            "Analyze the database schema and conversation history below.\n\n"
-            f"Database Schema:\n{json.dumps(schema, indent=2)}\n\n"
-            f"Recent Conversation History:\n{history_str}\n\n"
-            "Based on this, generate exactly 2 short textual (within 5-7 words) follow-up questions and 2 short visual plot/chart (within 5-7 words)suggestions.\n"
-            "- Textual suggestions must analyze or filter the data further (e.g. asking for details, filtering, or aggregations).\n"
-            "- Dont use words like Can you instead use direct prompt suggestions like 'summerise the data', 'Top 5 states with most filings' etc\n"
-            "- Visual suggestions must request plotting/visualizing/charting(Only Barplot & Pie plot are supported) the data (e.g., 'Plot filings by chapter', 'Bar chart of top states').\n\n"
-            "Return ONLY a JSON object with two keys:\n"
-            "  'textual': a list of exactly 2 strings\n"
-            "  'visual': a list of exactly 2 strings\n\n"
-            "JSON Format:\n"
+            "You are an expert AI analyst for a Bankruptcy Analytics Dashboard.\n\n"
+
+            "OBJECTIVE:\n"
+            "Generate intelligent, business-focused follow-up questions and visualization suggestions "
+            "based on:\n"
+            "1. Database schema\n"
+            "2. Current query result dataset\n"
+            "3. Conversation history\n"
+            "4. Previously explored insights\n\n"
+
+            f"DATABASE SCHEMA:\n{json.dumps(schema, indent=2)[:2000]}\n\n"
+            f"{history_str}\n"
+            f"{result_context}\n\n"
+            f"{last_question_context}"
+
+            "SUPPORTED VISUALIZATION TYPES:\n"
+            "- Bar Chart\n"
+            "- Horizontal Bar Chart\n"
+            "- Pie Chart\n"
+            "- Donut Chart\n"
+            "- Line Chart\n"
+            "- Area Chart\n"
+            "- Scatter Plot\n"
+            "- Histogram\n"
+            "- Heatmap\n\n"
+
+            "QUESTION GENERATION RULES:\n"
+
+            "A. TEXTUAL QUESTIONS\n"
+            "- Generate EXACTLY 4 questions.\n"
+            "- Maximum 12 words each.\n"
+            "- MUST be direct follow-up questions based on the current query/last user question and current query results.\n"
+            "- Business-focused and insight-driven.\n"
+            "- Questions must request data, metrics, comparisons, rankings, trends, summaries, "
+            "aggregations, filters, or anomalies that follow up logically on the previous query.\n"
+            "- strictly Avoid simple questions like \"What is the total number of bankruptcy cases in the database?\".\n"
+            "- MUST be answerable using the available schema and current dataset.\n"
+            "- MUST reference actual columns, categories, or values from the last query results whenever possible (e.g. if the last query filtered or grouped by certain states, years, chapters, or statuses, ask about specific states, years, chapters, or statuses from that result).\n"
+            "- Avoid repeating previously asked questions.\n"
+            "- Do NOT request charts or visualizations.\n"
+            "- Avoid these words:\n"
+            "  show, display, draw, chart, graph, plot, visualize, dashboard, view.\n"
+            "- Prefer formats such as:\n"
+            "  What is...\n"
+            "  How many...\n"
+            "  Which...\n"
+            "  Identify...\n"
+            "  Calculate...\n"
+            "  Compare...\n"
+            "  List...\n"
+            "  Find...\n\n"
+
+            "B. VISUALIZATION SUGGESTIONS\n"
+            "- Generate EXACTLY 4 suggestions.\n"
+            "- Maximum 12 words each.\n"
+            "- Explicitly mention ONE supported chart type.\n"
+            "- Must be business-relevant and actionable.\n"
+            "- Must use actual columns, categories, or values from the dataset.\n"
+            "- Prioritize trend analysis, distributions, rankings, comparisons, correlations, "
+            "and geographic insights.\n"
+            "- Use phrases such as:\n"
+            "  Bar chart of...\n"
+            "  Line chart showing...\n"
+            "  Donut chart for...\n"
+            "  Heatmap of...\n"
+            "  Scatter plot comparing...\n\n"
+
+            "CONTEXT AWARENESS:\n"
+            "- If this is the first interaction, suggest exploratory questions and charts.\n"
+            "- If prior results exist, generate deeper investigative follow-ups.\n"
+            "- Use actual values from the latest result summary whenever available.\n"
+            "- Focus on uncovering patterns, concentration risks, regional trends, filing behavior, "
+            "industry impacts, attorney performance, chapter distribution, court activity, "
+            "and temporal changes.\n\n"
+
+            "OUTPUT FORMAT:\n"
+            "Return ONLY valid JSON.\n"
+            "Do NOT return markdown, explanations, notes, comments, or additional text.\n\n"
+
             "{\n"
-            '  "textual": ["Question 1?", "Question 2?"],\n'
-            '  "visual": ["Plot a bar chart of ...", "Pie chart of ..."]\n'
-            "}\n"
-            "Do not include any markdown formatting or surrounding text."
+            '  "textual": [\n'
+            '    "Question 1",\n'
+            '    "Question 2",\n'
+            '    "Question 3",\n'
+            '    "Question 4"\n'
+            "  ],\n"
+            '  "visual": [\n'
+            '    "Visual 1",\n'
+            '    "Visual 2",\n'
+            '    "Visual 3",\n'
+            '    "Visual 4"\n'
+            "  ]\n"
+            "}"
         )
 
-        response = call_llm_haiku(prompt)
+
+
+        response = call_llm_haiku2(prompt)
         logger.info("Generated suggestions via Haiku: %s", response)
-        
-        # Try to parse response
+
         try:
             cleaned_response = response.strip()
             if cleaned_response.startswith("```"):
                 cleaned_response = re.sub(r"^```(?:json)?\n", "", cleaned_response)
                 cleaned_response = re.sub(r"\n```$", "", cleaned_response)
-            
+
             data = json.loads(cleaned_response)
             if isinstance(data, dict) and "textual" in data and "visual" in data:
-                return {
-                    "textual": [str(q).strip() for q in data["textual"]][:2],
-                    "visual": [str(q).strip() for q in data["visual"]][:2]
-                }
+                return clean_and_validate_suggestions(data, schema)
         except Exception as ex:
             logger.warning("Failed to parse Haiku JSON response: %s. Using regex fallback.", ex)
-            
+
         # Fallback regex parsing
-        textual = []
-        visual = []
+        textual, visual = [], []
         matches = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', response)
         for m in matches:
-            if m not in ["textual", "visual"] and len(m) > 10:
+            if m not in ["textual", "visual"] and len(m) > 8:
                 m_lower = m.lower()
-                if any(kw in m_lower for kw in ["chart", "plot", "graph", "visualize", "bar", "pie", "line"]):
-                    if len(visual) < 2:
+                if any(kw in m_lower for kw in ["chart", "plot", "graph", "visualize", "bar", "pie", "line", "donut", "scatter", "histogram", "heatmap", "area"]):
+                    if len(visual) < 4:
                         visual.append(m)
                 else:
-                    if len(textual) < 2:
+                    if len(textual) < 4:
                         textual.append(m)
-                        
-        if len(textual) >= 2 and len(visual) >= 2:
-            return {"textual": textual[:2], "visual": visual[:2]}
-            
+
+        if len(textual) >= 1 or len(visual) >= 1:
+            return clean_and_validate_suggestions({"textual": textual, "visual": visual}, schema)
+
     except Exception as e:
         logger.exception("Error generating dynamic suggestions: %s", e)
-        
-    return {
-        "textual": [
-            "How many total bankruptcy filings are there?",
-            "What are the top 5 states with the most filings?"
-        ],
-        "visual": [
-            "Show a pie chart of chapter distribution",
-            "Bar chart of filings count by state"
-        ]
-    }
+
+    # Fallback suggestions generated dynamically from the schema if the LLM call fails
+    columns_set = {col.get("name").lower() for col in schema.get("columns", [])} if schema else set()
+    fallback_textual = []
+    fallback_visual = []
+
+    if "state" in columns_set:
+        fallback_textual.append("Top 10 states with the most filings")
+        fallback_visual.append("Bar chart of filings by state")
+    if "status" in columns_set:
+        fallback_textual.append("What is active vs closed case breakdown?")
+    if "chapter" in columns_set:
+        fallback_visual.append("Pie chart of chapter distribution")
+    if "open_date" in columns_set or "date_filed" in columns_set:
+        fallback_visual.append("Line chart of filings by year")
+    if "attorney_last_name" in columns_set or "attorney_first_name" in columns_set or "attorney_dba" in columns_set:
+        fallback_visual.append("Horizontal bar chart of top 10 attorneys")
+
+    # Fill in generic ones to meet target counts
+    if len(fallback_textual) < 4:
+        fallback_textual.append("How many total bankruptcy filings are there?")
+    if len(fallback_textual) < 4:
+        fallback_textual.append("List the most recent 10 records")
+    if len(fallback_textual) < 4:
+        fallback_textual.append("Filter cases by Chapter 7")
+    if len(fallback_textual) < 4:
+        fallback_textual.append("Identify the top 10 states by volume")
+
+    if len(fallback_visual) < 4:
+        fallback_visual.append("Pie chart of chapter distribution")
+    if len(fallback_visual) < 4:
+        fallback_visual.append("Bar chart of filings by state")
+    if len(fallback_visual) < 4:
+        fallback_visual.append("Line chart of filings by year")
+    if len(fallback_visual) < 4:
+        fallback_visual.append("Horizontal bar chart of top 10 states")
+
+    return clean_and_validate_suggestions({"textual": fallback_textual, "visual": fallback_visual}, schema)
 
 
 def get_db_table_name():
@@ -202,10 +417,11 @@ def get_actual_database_schema():
         for col in columns:
             col_name = col[1]
             col_type = col[2]
+            clean_name = clean_column_name(col_name)
             schema["columns"].append({
                 "name": col_name,
                 "type": col_type,
-                "description": descriptions.get(col_name.lower(), f"Database field: {col_name}")
+                "description": descriptions.get(clean_name, f"Database field: {col_name}")
             })
         return schema
     except Exception as e:
@@ -257,26 +473,44 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
             f"DATABASE SCHEMA:\n{schema_text}\n\n"
             f"{conv_context}"
             "USER QUESTION: \"" + user_query + "\"\n\n"
+            "KEY COLUMN MAPPING RULES (use these to resolve ambiguity):\n"
+            "- 'active vs closed', 'case status', 'open/closed/dismissed/discharged' → use the 'status' column (values: Active, Closed, Dismissed, Converted, Pending, Discharged). Note: if the query specifically requests a comparison/breakdown between specific statuses (like 'active vs closed'), only return those specific statuses.\n"
+            "- 'active/inactive flag' → use the 'active_status' column\n"
+            "- 'new/closed/reopened/update record stage' → use the 'record_type' column (values: New, Closed, Reopened, Update)\n"
+            "- 'bankruptcy chapter', 'chapter 7/11/13' → use the 'chapter' column\n"
+            "- 'filing date', 'when filed' → use the 'date_filed' column\n"
+            "- 'debtor name' → use 'first_name' and 'last_name'\n"
+            "- 'state' (debtor location) → use the 'state' column\n"
+            "- 'attorney', 'lawyer' → use the 'Attorny_First_Name', 'Attorny_lastt_Name' or 'Attorny_DBA' columns. When analyzing or grouping by attorney, ask to show 'Attorny_DBA' (or include first and last names along with 'Attorny_DBA') to represent different practitioners/firms.\n"
+            "- 'year', 'yearly', 'by year', 'annual' → use the 'date_filed' or 'open_date' column (or date columns) and extract the year using SQLite's strftime('%Y', ...) function.\n\n"
             "INSTRUCTIONS:\n"
             "1. Understand the user's intent (data_retrieval, aggregation, filter, visualization, follow_up, or unclear).\n"
-            "2. Rewrite the question as a clear, unambiguous SQL-ready English query using exact column names from the schema.\n"
-            "   - Map informal terms to schema columns (e.g., 'debtor name' → First_name, Last_name; 'filing date' → date_filed; 'state' → State).\n"
+            "2. Rewrite the question as a clear, unambiguous PLAIN ENGLISH query using EXACT column names from the schema.\n"
+            "   IMPORTANT: normalized_query must be a natural language sentence, NOT SQL code.\n"
+            "   - Map informal terms to schema columns using the KEY COLUMN MAPPING RULES above.\n"
+            "   - Use ONLY column names that exist in the schema. Never invent column names.\n"
             "   - Expand abbreviations and correct spelling based on schema knowledge.\n"
-            "   - Preserve all filters, conditions, and aggregation requests.\n"
-            "3. List the relevant column names from the schema.\n"
+            "   - Preserve all filters, conditions, aggregation requests, AND visualization keywords.\n"
+            "   - If the user asked for a 'bar chart', 'pie chart', 'plot', etc., keep those words in the normalized_query.\n"
+            "   - Example: 'bar chart of filings by state' → 'Show a bar chart of the count grouped by state column'\n"
+            "   - Example: 'show debtors in NY' → 'Retrieve records where state = NY showing first_name, last_name, city, state'\n"
+            "   - Example: 'active vs closed case breakdown' → 'Show count of cases grouped by status column filtered to show only status is Active or Closed'\n"
+            "   - Example: 'Analyze filings by year and status' → 'Retrieve counts of records grouped by the year (extracted using strftime from date_filed or open_date column) and status column'\n"
+            "   - Example: 'Show chapter distribution for each state' → 'Retrieve counts of records grouped by state and chapter columns showing both columns'\n"
+            "3. List the relevant column names from the schema (use exact column names).\n"
             "4. Extract any time/date filter mentioned (e.g., '2024', 'last year', 'Q1 2023') or null.\n"
             "5. Determine if the question is answerable from the schema (true/false).\n"
             "6. If unclear or unanswerable, provide a brief clarification message.\n\n"
             "Return ONLY a valid JSON object with these exact keys:\n"
             "{\n"
-            '  "normalized_query": "...",\n'
+            '  "normalized_query": "plain English rewrite - never SQL",\n'
             '  "intent": "data_retrieval|aggregation|filter|visualization|follow_up|unclear",\n'
             '  "relevant_columns": ["col1", "col2"],\n'
             '  "time_filter": "2024" or null,\n'
             '  "is_answerable": true or false,\n'
             '  "clarification_needed": "..." or null\n'
             "}\n"
-            "Do NOT include markdown, explanations, or any text outside the JSON."
+            "Do NOT include markdown, SQL code, or any text outside the JSON."
         )
 
         response = call_llm_haiku(prompt)
@@ -290,9 +524,14 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
 
         result = json.loads(cleaned)
 
-        # Validate and normalize result keys
+        # Validate: reject normalized_query if it looks like SQL
+        normalized = result.get("normalized_query", user_query).strip()
+        if normalized.strip().upper().startswith(("SELECT", "WITH", "INSERT", "UPDATE", "DELETE")):
+            logger.warning("Haiku returned SQL as normalized_query — falling back to user_query")
+            normalized = user_query
+
         return {
-            "normalized_query": result.get("normalized_query", user_query).strip(),
+            "normalized_query": normalized,
             "intent": result.get("intent", "data_retrieval"),
             "relevant_columns": result.get("relevant_columns", []),
             "time_filter": result.get("time_filter"),
@@ -412,21 +651,53 @@ def generate_sql_from_question(user_question, schema, conversation_memory=None, 
                     memory_lines.append(f"Result: {entry['record_count']} rows")
             memory_context = "\n".join(memory_lines)
 
+        # Build a human-readable column listing with descriptions for the prompt
+        def _format_columns_for_prompt(columns):
+            lines = []
+            for col in columns:
+                col_name = col.get('name') or col.get('Column Name', '')
+                col_type = col.get('type') or col.get('Data Type', 'string')
+                col_desc = col.get('description') or col.get('Description', '')
+                lines.append(f"  - {col_name} ({col_type}): {col_desc}")
+            return "\n".join(lines)
+
         prompt = (
-            "You are an assistant that converts a natural language request into a single SQLite-compatible SQL query.\n"
-            "All the dates are in the format YYYY-MM-DD.\n"
+            "You are a Senior SQL Analyst specializing in bankruptcy analytics.\n"
+            "Your task is to translate natural language user questions into a single SQLite-compatible SQL query.\n"
+            "All dates in the database are stored in YYYY-MM-DD format.\n"
             "Return only valid JSON with a single key `sql` whose value is the SQL string.\n"
-            "for date relates question Use Open_date, Close_date column and formulate sql like strftime('%Y', Open_date) = '2024'\n"
-            "Do NOT include explanations or additional fields. Ensure the SQL is compatible with SQLite.\n\n"
+            "To filter date columns (such as open_date, date_filed, status_date, etc.) by year, use SQLite's strftime function, e.g. strftime('%Y', open_date) = '2024'.\n"
+            "Do NOT include explanations, comments, or additional fields. Ensure the SQL is fully compatible with SQLite.\n\n"
+            "CRITICAL COLUMN RULES:\n"
+            "1. You MUST ONLY use column names that are EXACTLY listed in the schema below. Do NOT invent, guess, or fabricate column names.\n"
+            "2. Column names are CASE-SENSITIVE in the schema. Use the EXACT casing shown (e.g., 'status' not 'Status', 'active_status' not 'Active_Status').\n"
+            "3. READ the column descriptions carefully to understand what each column represents before choosing which column to use.\n"
+            "4. SEMANTIC MAPPING RULES (use these to pick the correct column):\n"
+            "   - 'active vs closed', 'case status', 'open/closed/dismissed/discharged' → use the 'status' column\n"
+            "   - 'active/inactive flag' → use the 'active_status' column\n"
+            "   - 'new/closed/reopened/update record stage' → use the 'record_type' column\n"
+            "   - 'bankruptcy chapter', 'chapter 7/11/13' → use the 'chapter' column\n"
+            "   - 'filing date', 'when filed' → use the 'date_filed' column\n"
+            "   - 'debtor name' → use 'first_name' and 'last_name' (or pd_ prefixed variants)\n"
+            "   - 'state' (for debtor location) → use the 'state' column\n"
+            "   - 'attorney', 'lawyer' → use 'Attorny_First_Name', 'Attorny_lastt_Name', or 'Attorny_DBA'. When grouping, analyzing, or counting filings 'by attorney', group by 'Attorny_DBA' (or combine individual name columns with 'Attorny_DBA') to ensure distinct firms/practitioners are shown and the output is meaningful.\n"
+            "5. SPECIFIC FILTER/COMPARISON RULES:\n"
+            "   - If the user query specifies a comparison, vs, or breakdown between specific values of a column (e.g., 'active vs closed', 'chapter 7 vs 13', 'New vs Closed'), you MUST filter the query using WHERE/HAVING to include ONLY those specific values. For example, for 'active vs closed case breakdown', filter status using `TRIM(status) IN ('Active', 'Closed')`.\n"
+            "   - If the user query does NOT specify specific comparison values for status or other columns, do NOT add filters limiting the column values (e.g. do not filter status to ('Active', 'Closed') unless requested).\n"
+            "6. If unsure which column to use, ALWAYS prefer the column whose description best matches the user's intent.\n"
+            "7. YEAR GROUPING RULES:\n"
+            "   - If the user query requests analysis, breakdown, or grouping 'by year' or 'yearly' (e.g. 'filings by year', 'trends by year'), you MUST extract the year from date columns (preferring 'date_filed' or 'open_date' columns depending on availability and description) using SQLite's strftime('%Y', date_column_name) or substr(date_column_name, 1, 4), name it `year`, include it in the SELECT list, and group by it (e.g. `SELECT strftime('%Y', date_filed) as year, status, count(*) ... GROUP BY year, status`).\n"
+            "8. COLUMN DISTRIBUTION/BREAKDOWN RULES (CRITICAL):\n"
+            "   - If the user query asks for a distribution, breakdown, ratio, or comparison of a column (such as chapter, status, record_type, etc.) 'for each' or 'by' another column (such as state, client, year, etc.) (e.g. 'chapter distribution for each state', 'case status breakdown by client'), you MUST select BOTH columns (the distributed column like 'chapter' and the grouping column like 'state') in the SELECT clause, group by BOTH columns in the GROUP BY clause, and count the total cases (e.g., `SELECT state, chapter, count(*) AS count FROM uploaded_data GROUP BY state, chapter`). NEVER select or group by only one of them when a breakdown/distribution of X by Y is requested. Failure to select and group by both columns is a critical violation.\n\n"
         )
 
         if main_schema and schema and schema.get('table_name') != main_schema.get('table_name'):
             prompt += (
                 f"You have access to two tables:\n"
                 f"1. The MAIN table: `{main_schema['table_name']}`\n"
-                f"   Main table columns (JSON): {json.dumps(main_schema['columns'])}\n\n"
+                f"   Main table columns:\n{_format_columns_for_prompt(main_schema['columns'])}\n\n"
                 f"2. The TEMPORARY table `{schema['table_name']}` containing the results of the previous query.\n"
-                f"   Temporary table columns (JSON): {json.dumps(schema['columns'])}\n\n"
+                f"   Temporary table columns:\n{_format_columns_for_prompt(schema['columns'])}\n\n"
                 f"CRITICAL GUIDELINE:\n"
                 f"- If the user's follow-up request refers to or queries columns, aggregates, or details that are ONLY in the main table, "
                 f"you should query the main table `{main_schema['table_name']}` using filters matching the context of previous queries in the history.\n"
@@ -435,8 +706,8 @@ def generate_sql_from_question(user_question, schema, conversation_memory=None, 
             )
         else:
             prompt += (
-                "Database schema (JSON):\n" + json.dumps(schema['columns']) + "\n\n"
-                "Table name: " + schema['table_name'] + "\n"
+                f"Database table: {schema['table_name']}\n"
+                f"Available columns (ONLY use these exact names):\n{_format_columns_for_prompt(schema['columns'])}\n\n"
             )
 
         if memory_context:
@@ -512,12 +783,18 @@ SQL QUERY TO VALIDATE:
 
 VALIDATION RULES:
 1. Check if the SQL syntax is valid SQLite3
-2. Check if column names are exact matches from the schema (no typos or incorrect column names)
-3. Check if the query answers the user's question
-4. Check if the date formats are correct (YYYY-MM-DD) if dates are involved.
+2. Check if column names are EXACT matches from the schema — same spelling AND same casing (e.g., 'status' not 'Status', 'active_status' not 'Active_Status'). If a column name does not exist in the schema, the query is INVALID.
+3. Check if the query answers the user's question using the CORRECT column:
+   - 'active vs closed' or 'case status' should use the 'status' column, NOT 'record_type' or 'active_status'
+   - 'record stage' (New/Closed/Reopened/Update) should use 'record_type'
+   - 'active/inactive flag' should use 'active_status'
+4. Check if the query limits the results to only the specified comparison categories if the user asked for a breakdown/comparison between specific categories (e.g., if the user asked for 'active vs closed breakdown', the SQL must filter status to 'Active' and 'Closed' using a WHERE/HAVING clause like TRIM(status) IN ('Active', 'Closed')). If the user did NOT request filtering by specific categories, the SQL should NOT include such filters.
+5. Check if the user's question asks for analysis, counts, or grouping 'by year' or 'yearly'. If so, the query must extract the year using strftime('%Y', date_column) or substr(date_column, 1, 4), name it `year`, include it in the SELECT list, and group by it. If the query fails to group by year when requested, it is INVALID.
+6. Check if the user's question asks for a distribution, breakdown, ratio, or comparison of one column (e.g. chapter) by/for/each another column (e.g. state) (e.g., 'chapter distribution for each state'). If so, the query MUST select and group by BOTH columns (e.g. selecting both state and chapter, grouping by both state and chapter), not just one. If the query only selects or groups by one column, it is INVALID and you MUST repair it to select both columns in the SELECT clause and group by both in the GROUP BY clause.
+7. Check if the date formats are correct (YYYY-MM-DD) if dates are involved.
 {rule_5}
-6. Do not include ';' at the end of the query
-7. Reject any queries that attempt to modify data
+9. Do not include ';' at the end of the query
+10. Reject any queries that attempt to modify data
 
 RESPOND WITH ONLY valid JSON:
 - If VALID: {{"VALID": "YES"}}
@@ -596,36 +873,82 @@ def execute_sql_query(sql_query):
 
 
 def should_generate_insights(user_query, result_df):
-    """Determine if a visual chart should be generated from user query"""
+    """Determine if a visual chart should be generated from user query."""
     if result_df is None or result_df.empty or len(result_df) < 2:
         return False
-    keywords = {
-        "insight", "insights", "plot", "plots", "chart", "charts",
-        "graph", "graphs", "visual", "visualize", "visualise",
-        "visualization", "distribution", "trend", "breakdown",
-        "compare", "comparison", "percentage", "share", "dashboard",
+    
+    # Generic visualization and chart/plot request keywords
+    CHART_KEYWORDS = {
+        # Direct chart/plot/visual requests
+        "plot", "plots", "chart", "charts", "graph", "graphs",
+        "visualize", "visualise", "visualization", "visualisation", "draw",
+        # Generic request keywords that should trigger charts
+        "show", "display", "view", "breakdown", "distribution", "trend", "trends",
+        # Explicit chart types
+        "pie chart", "bar chart", "line chart", "area chart",
+        "donut chart", "scatter plot", "histogram", "heatmap",
+        "horizontal bar",
+        # Short type names — only when they clearly mean a chart
+        "pie", "donut", "scatter",
+        # Insight-specific
+        "insight", "insights", "dashboard",
+        # Comparison / Versus keywords
+        "compare", "versus", "vs", "difference",
     }
-    return any(kw in user_query.lower() for kw in keywords)
+    q_lower = user_query.lower()
+    return any(kw in q_lower for kw in CHART_KEYWORDS)
 
 
 def detect_chart_type(user_query):
-    """Detect appropriate visualization type"""
-    query_lower = user_query.lower()
-    if any(k in query_lower for k in ["pie", "donut", "ratio", "proportion"]):
+    """Detect appropriate visualization type from user query keywords"""
+    q = user_query.lower()
+    # Most specific matches first
+    if any(k in q for k in ["donut", "doughnut"]):
+        return "donut"
+    if any(k in q for k in ["pie", "ratio", "proportion", "breakdown"]):
         return "pie"
-    if any(k in query_lower for k in ["bar", "histogram", "column", "compare"]):
+    if any(k in q for k in ["scatter", "correlation"]):
+        return "scatter"
+    if any(k in q for k in ["heatmap", "heat map", "matrix"]):
+        return "heatmap"
+    if any(k in q for k in ["histogram", "frequency"]):
+        return "histogram"
+    if any(k in q for k in ["horizontal bar", "ranked", "ranking"]):
+        return "horizontal_bar"
+    if any(k in q for k in ["area chart", "area plot", "filled"]):
+        return "area"
+    if any(k in q for k in ["line chart", "line plot", "trend line", "over time", "trend", "growth", "year", "month", "yearly", "monthly"]):
+        return "line"
+    if any(k in q for k in ["bar chart", "bar plot", "bar graph", "bar", "column", "compare"]):
         return "bar"
-    if any(k in query_lower for k in ["trend", "line", "growth", "over time"]):
-        return "trend"
     return "auto"
 
 
+def clean_column_name(name):
+    """Normalize column names to standard lowercase snake_case and resolve common typos."""
+    if not name or not isinstance(name, str):
+        return name
+    n = name.strip().lower().replace(" ", "_")
+    # Clean typos / spelling inconsistencies
+    n = n.replace("attorny", "attorney")
+    n = n.replace("lastt", "last")
+    n = n.replace("addl_1", "address_line_1")
+    n = n.replace("addl_2", "address_line_2")
+    n = n.replace("ac_no", "account_number")
+    n = n.replace("client", "client_name")
+    n = n.replace("creditor_time", "creditor_meeting_time")
+    n = n.replace("notification_no", "notification_number")
+    n = n.replace("case_no", "case_number")
+    return n
+
+
 def _load_and_clean_csv(uploaded_file):
-    """Read CSV, strip whitespace from columns, clean rows"""
+    """Read CSV, strip whitespace from columns, clean rows and map columns to clean schema"""
     try:
         df = pd.read_csv(uploaded_file)
         df.columns = df.columns.str.strip()
         df = df.loc[:, df.columns != '']
+        df.columns = [clean_column_name(col) for col in df.columns]
         string_cols = df.select_dtypes(include=['object']).columns
         for col in string_cols:
             df[col] = df[col].apply(lambda x: x.strip() if isinstance(x, str) else x)
@@ -741,18 +1064,44 @@ def is_pure_chart_request(user_query):
 
 
 def is_followup_question(user_query, conversation_history):
-    """Detect if the user is asking a follow-up question."""
+    """Detect if the user is asking a follow-up question.
+
+    A query is a follow-up ONLY if it refers back to the active result set via
+    pronouns / reference words, OR is a pure chart request with no new
+    entity/column/filter that would require a fresh main-DB query.
+    """
     if not st.session_state.temp_table_name:
         return False
-    
-    # 1. If it's a chart request and we have active data, treat as a follow-up
-    if is_chart_request(user_query):
-        return True
-    
-    # 2. Check standard follow-up keywords
-    followup_keywords = ['that', 'those', 'these', 'records', 'results', 'data', 'rows', 'items', 'from that', 'from there', 'among those', 'above', 'convert', 'previous']
+
     query_lower = user_query.lower()
-    return any(kw in query_lower for kw in followup_keywords)
+
+    # --- Standard reference-word follow-ups ---
+    followup_keywords = [
+        'that', 'those', 'these', 'records', 'results', 'rows', 'items',
+        'from that', 'from there', 'among those', 'above', 'convert', 'previous',
+    ]
+    if any(kw in query_lower for kw in followup_keywords):
+        return True
+
+    # --- Chart request: only treat as follow-up if it is a *pure* re-chart ---
+    # i.e. "plot this", "pie chart", "bar chart" WITHOUT naming a new entity
+    # (year, state, attorney, chapter, district, debtor, filing, etc.) that
+    # would require going back to the main database.
+    if is_chart_request(user_query):
+        NEW_ENTITY_HINTS = [
+            'year', 'month', 'quarter', 'state', 'district', 'chapter',
+            'attorney', 'debtor', 'filing', 'case', 'judge', 'trustee',
+            'top', 'bottom', 'by state', 'by year', 'by chapter', 'by district',
+            'by attorney', 'over time', 'trend',
+        ]
+        if any(hint in query_lower for hint in NEW_ENTITY_HINTS):
+            # Needs a fresh query against the main DB — NOT a follow-up
+            return False
+        # No new entity hints → pure re-chart of the active result set
+        return True
+
+    return False
+
 
 
 # =============================================================================
@@ -843,7 +1192,9 @@ def _handle_user_query(user_query, schema, active_schema):
         effective_query = understanding["normalized_query"] if understanding["normalized_query"] else user_query
         # ── End Smart Query Understanding ──────────────────────────────────────
 
-        is_followup = is_followup_question(effective_query, st.session_state.conversation_memory)
+        # NOTE: keyword-based detection always uses original user_query
+        # effective_query (schema-normalized) is used ONLY for SQL generation + validation
+        is_followup = is_followup_question(user_query, st.session_state.conversation_memory) or (understanding.get("intent") == "follow_up")
         
         if is_followup and st.session_state.temp_table_schema:
             working_schema = st.session_state.temp_table_schema
@@ -851,7 +1202,7 @@ def _handle_user_query(user_query, schema, active_schema):
             logger.info("Using temporary table for follow-up query | table=%s", working_schema.get('table_name'))
         else:
             working_schema = active_schema if active_schema else schema
-            if any(kw in effective_query.lower() for kw in ['clear', 'reset', 'new query', 'fresh', 'different']):
+            if any(kw in user_query.lower() for kw in ['clear', 'reset', 'new query', 'fresh', 'different']):
                 if st.session_state.temp_table_name:
                     drop_temporary_table(st.session_state.temp_table_name)
                     st.session_state.temp_table_name = None
@@ -901,7 +1252,7 @@ def _handle_user_query(user_query, schema, active_schema):
 
         is_visualization_fallback = False
         main_db_schema = active_schema if active_schema else schema
-        if is_followup and st.session_state.temp_table_dataframe is not None and is_pure_chart_request(effective_query):
+        if is_followup and st.session_state.temp_table_dataframe is not None and is_pure_chart_request(user_query):
             logger.info("Pure chart request detected. Bypassing SQL generation and reusing active dataset.")
             final_query = st.session_state.temp_table_source_query
             result_df = st.session_state.temp_table_dataframe
@@ -919,7 +1270,7 @@ def _handle_user_query(user_query, schema, active_schema):
                     main_schema=main_db_schema,
                 )
 
-            if not sql_query and is_followup and st.session_state.temp_table_dataframe is not None and is_chart_request(effective_query):
+            if not sql_query and is_followup and st.session_state.temp_table_dataframe is not None and is_chart_request(user_query):
                 logger.info("Empty SQL generated for chart follow-up query. Re-using active dataset.")
                 final_query = st.session_state.temp_table_source_query
                 result_df = st.session_state.temp_table_dataframe
@@ -1006,17 +1357,31 @@ def _handle_user_query(user_query, schema, active_schema):
         success_msg = f" Generated chart for the active dataset:" if is_visualization_fallback else f" Query results: "
         st.success("")
         st.dataframe(format_table(result_df), width='stretch', hide_index=True)
-        if not is_followup:
+        if result_df is not None and not result_df.empty:
+            old_temp_table = st.session_state.get("temp_table_name")
             temp_table_name, temp_schema = create_temporary_table_from_dataframe(result_df, final_query)
             if temp_table_name and temp_schema:
+                if old_temp_table and old_temp_table != temp_table_name:
+                    drop_temporary_table(old_temp_table)
                 st.session_state.temp_table_name = temp_table_name
                 st.session_state.temp_table_schema = temp_schema
                 st.session_state.temp_table_source_query = final_query
                 st.session_state.temp_table_dataframe = result_df
                 st.info(f" Result set stored as temporary table. You can ask follow-up questions about these {len(result_df)} records.")
         
-        should_insights = should_generate_insights(effective_query, result_df) or is_visualization_fallback
-        chart_type = detect_chart_type(effective_query)
+        # Use original user_query for intent/keyword detection — effective_query may be schema-rewritten
+        should_insights = should_generate_insights(user_query, result_df) or is_visualization_fallback
+        # Only trust Haiku's 'visualization' intent if the user also used an
+        # explicit chart keyword — prevents false positives on 'show me X' queries
+        if not should_insights and understanding.get("intent") == "visualization":
+            EXPLICIT_CHART_WORDS = {
+                "plot", "chart", "graph", "visualize", "visualise",
+                "pie", "bar", "donut", "scatter", "histogram",
+                "heatmap", "line chart", "area chart",
+            }
+            if any(cw in user_query.lower() for cw in EXPLICIT_CHART_WORDS):
+                should_insights = True
+        chart_type = detect_chart_type(user_query)
         
         if should_insights and (len(result_df) >= 2 or is_visualization_fallback):
             with st.expander(" View Insights and Charts", expanded=True):
@@ -1126,10 +1491,24 @@ def render_query_box_tab(schema, active_schema):
     # DYNAMIC AUTO PROMPT SUGGESTIONS (TEXTUAL & VISUAL) via Bedrock Haiku
     # -------------------------------------------------------------------------
     schema_to_use = active_schema if active_schema else schema
-    with st.spinner(" Updating suggested prompts..."):
-        suggestions = _generate_dynamic_prompt_suggestions(
-            schema_to_use, st.session_state.conversation_memory
-        )
+
+    # Calculate state key to avoid regenerating suggestions on every rerun
+    history_len = len(st.session_state.conversation_memory.get("history", [])) if "conversation_memory" in st.session_state else 0
+    active_temp_table = st.session_state.get("temp_table_name")
+    last_msg_content = st.session_state.messages[-1]["content"] if st.session_state.messages else ""
+    current_state_key = f"sug_{history_len}_{active_temp_table}_{st.session_state.get('last_uploaded_file_name')}_{hashlib.sha256(str(last_msg_content).encode()).hexdigest()}"
+
+    if "suggestions_state_key" not in st.session_state or st.session_state.suggestions_state_key != current_state_key or "current_suggestions" not in st.session_state:
+        with st.spinner(" Updating suggested prompts..."):
+            suggestions = _generate_dynamic_prompt_suggestions(
+                schema_to_use,
+                st.session_state.get("conversation_memory"),
+                last_result_df=st.session_state.get("temp_table_dataframe"),
+            )
+            st.session_state.current_suggestions = suggestions
+            st.session_state.suggestions_state_key = current_state_key
+    else:
+        suggestions = st.session_state.current_suggestions
 
    
     # CSS to style suggestion buttons as clean outline buttons (removing blue boxes)
@@ -1175,19 +1554,19 @@ def render_query_box_tab(schema, active_schema):
         unsafe_allow_html=True
     )
 
-    col_t, col_v = st.columns(2)
-    
+    col_t, col_v = st.columns([1, 1])
+
     with col_t:
         st.markdown('<div class="suggest-anchor-textual"></div>', unsafe_allow_html=True)
-        # st.caption(" Textual Analysis")
+        st.caption(" Follow-up questions")
         for idx, txt_q in enumerate(suggestions.get("textual", [])):
             if st.button(txt_q, key=f"suggest_text_{idx}", use_container_width=True):
                 st.session_state.suggested_question_selected = txt_q
                 st.rerun()
-                
+
     with col_v:
         st.markdown('<div class="suggest-anchor-visual"></div>', unsafe_allow_html=True)
-        # st.caption(" Visual Charts & Plots")
+        st.caption(" Chart suggestions")
         for idx, vis_q in enumerate(suggestions.get("visual", [])):
             if st.button(vis_q, key=f"suggest_visual_{idx}", use_container_width=True):
                 st.session_state.suggested_question_selected = vis_q

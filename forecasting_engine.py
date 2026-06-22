@@ -68,29 +68,46 @@ def load_monthly_series(
         cur.execute(f"PRAGMA table_info({table})")
         cols = {r[1] for r in cur.fetchall()}
 
-        date_col  = "Open_date" if "Open_date" in cols else ("date_filed" if "date_filed" in cols else None)
-        score_col = "match_score" if "match_score" in cols else None
+        # Resolve database column names case-insensitively
+        def get_db_col(logical_name):
+            for c in cols:
+                if c.lower() == logical_name.lower():
+                    return c
+            # Fallback client mapping
+            if logical_name.lower() == 'client':
+                for c in cols:
+                    if c.lower() == 'client_name':
+                        return c
+            return None
+
+        date_col  = get_db_col("open_date") or get_db_col("date_filed")
+        score_col = get_db_col("match_score")
 
         if not date_col:
             conn.close()
             return pd.DataFrame()
 
         where = []
-        if chapter_filter and "chapter" in cols:
-            where.append(f"chapter = {chapter_filter}")
-        if state_filter and "State" in cols:
-            where.append(f"State = '{state_filter}'")
-        if status_filter and "status" in cols:
-            where.append(f"status = '{status_filter}'")
-        if prose_filter and "prose_indicator" in cols:
+        chapter_col = get_db_col("chapter")
+        if chapter_filter and chapter_col:
+            where.append(f"{chapter_col} = {chapter_filter}")
+        state_col = get_db_col("state")
+        if state_filter and state_col:
+            where.append(f"{state_col} = '{state_filter}'")
+        status_col = get_db_col("status")
+        if status_filter and status_col:
+            where.append(f"{status_col} = '{status_filter}'")
+        prose_col = get_db_col("prose_indicator")
+        if prose_filter and prose_col:
             if prose_filter in ["1", "Y", "Yes"]:
-                where.append("(prose_indicator = '1' OR prose_indicator = 'Y' OR prose_indicator = 'Yes')")
+                where.append(f"({prose_col} = '1' OR {prose_col} = 'Y' OR {prose_col} = 'Yes' OR {prose_col} = 1)")
             elif prose_filter in ["0", "N", "No"]:
-                where.append("(prose_indicator = '0' OR prose_indicator = 'N' OR prose_indicator = 'No')")
+                where.append(f"({prose_col} = '0' OR {prose_col} = 'N' OR {prose_col} = 'No' OR {prose_col} = 0)")
             else:
-                where.append(f"prose_indicator = '{prose_filter}'")
-        if client_filter and "client" in cols:
-            where.append(f"client = '{client_filter}'")
+                where.append(f"{prose_col} = '{prose_filter}'")
+        client_col = get_db_col("client_name") or get_db_col("client")
+        if client_filter and client_col:
+            where.append(f"{client_col} = '{client_filter}'")
         if start_date:
             s = start_date.strftime("%Y-%m-%d") if hasattr(start_date, "strftime") else str(start_date)
             where.append(f"{date_col} >= '{s}'")
@@ -906,17 +923,26 @@ def detect_state_anomalies(top_n: int = 10) -> pd.DataFrame:
         cur  = conn.cursor()
         cur.execute(f"PRAGMA table_info({table})")
         cols = {r[1] for r in cur.fetchall()}
-        if "State" not in cols or "Open_date" not in cols:
+        def get_db_col(logical_name):
+            for c in cols:
+                if c.lower() == logical_name.lower():
+                    return c
+            return None
+            
+        state_col = get_db_col("state")
+        date_col = get_db_col("open_date") or get_db_col("date_filed")
+        
+        if not (state_col and date_col):
             conn.close()
             return pd.DataFrame()
 
         df = pd.read_sql_query(
             f"""
-            SELECT State, substr(Open_date,1,4) AS Year, COUNT(*) AS Filings
+            SELECT {state_col} AS State, substr({date_col},1,4) AS Year, COUNT(*) AS Filings
             FROM {table}
-            WHERE Open_date IS NOT NULL AND Open_date LIKE '20%'
-                  AND State IS NOT NULL AND State != ''
-            GROUP BY State, Year ORDER BY State, Year
+            WHERE {date_col} IS NOT NULL AND {date_col} LIKE '20%'
+                  AND {state_col} IS NOT NULL AND {state_col} != ''
+            GROUP BY {state_col}, Year ORDER BY {state_col}, Year
             """, conn,
         )
         conn.close()
@@ -959,19 +985,29 @@ def get_risk_heatmap_data() -> pd.DataFrame:
         cur  = conn.cursor()
         cur.execute(f"PRAGMA table_info({table})")
         cols = {r[1] for r in cur.fetchall()}
-        if not all(c in cols for c in ["State", "chapter", "match_score"]):
+        def get_db_col(logical_name):
+            for c in cols:
+                if c.lower() == logical_name.lower():
+                    return c
+            return None
+            
+        state_col = get_db_col("state")
+        chapter_col = get_db_col("chapter")
+        score_col = get_db_col("match_score")
+        
+        if not (state_col and chapter_col and score_col):
             conn.close()
             return pd.DataFrame()
 
         df = pd.read_sql_query(
             f"""
-            SELECT State, chapter,
-                   ROUND(AVG(match_score), 1) AS Avg_Risk,
+            SELECT {state_col} AS State, {chapter_col} AS chapter,
+                   ROUND(AVG({score_col}), 1) AS Avg_Risk,
                    COUNT(*) AS Case_Count
             FROM {table}
-            WHERE State IS NOT NULL AND State != ''
-                  AND chapter IS NOT NULL AND match_score IS NOT NULL
-            GROUP BY State, chapter HAVING COUNT(*) >= 2
+            WHERE {state_col} IS NOT NULL AND {state_col} != ''
+                  AND {chapter_col} IS NOT NULL AND {score_col} IS NOT NULL
+            GROUP BY {state_col}, {chapter_col} HAVING COUNT(*) >= 2
             """, conn,
         )
         conn.close()

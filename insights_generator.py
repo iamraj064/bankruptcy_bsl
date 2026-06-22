@@ -53,13 +53,40 @@ sns.set_style("whitegrid", {
 })
 
 
+def show_centered_plot(fig, use_container_width=True, clear_figure=True, ratio=0.7):
+    """Render a Matplotlib figure centered in the Streamlit interface"""
+    side_ratio = (1.0 - ratio) / 2.0
+    c1, c2, c3 = st.columns([side_ratio, ratio, side_ratio])
+    with c2:
+        st.pyplot(fig, use_container_width=True, clear_figure=clear_figure)
+
+
 class DataInsightsGenerator:
     """Generate comprehensive insights from query results"""
     
     def __init__(self, result_df: pd.DataFrame):
         self.df = result_df
-        self.numeric_cols = self.df.select_dtypes(include="number").columns.tolist()
-        self.categorical_cols = [col for col in self.df.columns if col not in self.numeric_cols]
+        raw_numeric_cols = self.df.select_dtypes(include="number").columns.tolist()
+        
+        self.numeric_cols = []
+        self.categorical_cols = []
+        
+        for col in self.df.columns:
+            if col in raw_numeric_cols:
+                # Distinguish between value/measure columns and identifier/low-cardinality integer categories (e.g. Chapter 7/11/13, Year 2024)
+                is_value_col = any(x in str(col).lower() for x in ['count', 'total', 'frequency', 'value', 'sum', 'amount', 'pct', 'ratio'])
+                is_low_cardinality_int = (
+                    pd.api.types.is_integer_dtype(self.df[col]) and 
+                    self.df[col].nunique() <= 20 and
+                    not is_value_col
+                )
+                if is_low_cardinality_int and len(raw_numeric_cols) > 1:
+                    self.categorical_cols.append(col)
+                else:
+                    self.numeric_cols.append(col)
+            else:
+                self.categorical_cols.append(col)
+                
         self.date_cols = self._detect_date_columns()
     
     def _detect_date_columns(self) -> List[str]:
@@ -182,6 +209,13 @@ class InsightVisualizer:
     def __init__(self, result_df: pd.DataFrame, insights_gen: DataInsightsGenerator):
         self.df = result_df
         self.insights = insights_gen
+
+    def _aggregate_by_category(self, cat_col: str, num_col: str) -> pd.Series:
+        """Helper to aggregate a numeric column by a category using sum or mean depending on the column name."""
+        num_lower = str(num_col).lower()
+        if any(x in num_lower for x in ["avg", "mean", "score", "pct", "ratio", "percentage"]):
+            return self.df.groupby(cat_col)[num_col].mean()
+        return self.df.groupby(cat_col)[num_col].sum()
     
     def _is_year_column(self, col_name: str, values: pd.Series) -> bool:
         """Detect whether a categorical column likely represents years"""
@@ -323,13 +357,13 @@ class InsightVisualizer:
 
         # Missing data report
         missing_report = self.insights.get_missing_data_report()
-        if missing_report:
-            with st.expander(" Missing Data Details", expanded=False):
-                missing_df = pd.DataFrame([
-                    {"Column": col, "Missing Count": data["count"], "% Missing": data["percentage"]}
-                    for col, data in missing_report.items()
-                ])
-                st.dataframe(missing_df, use_container_width=True)
+        # if missing_report:
+        #     with st.expander(" Missing Data Details", expanded=False):
+        #         missing_df = pd.DataFrame([
+        #             {"Column": col, "Missing Count": data["count"], "% Missing": data["percentage"]}
+        #             for col, data in missing_report.items()
+        #         ])
+        #         st.dataframe(missing_df, use_container_width=True)
     
     def render_numeric_analysis(self):
         """Render comprehensive numeric column analysis"""
@@ -384,7 +418,8 @@ class InsightVisualizer:
                 )
                 if is_aggregated:
                     cat_col = self.insights.categorical_cols[0]
-                    bar_data = self.df[[cat_col, col]].drop_duplicates()
+                    agg_series = self._aggregate_by_category(cat_col, col)
+                    bar_data = pd.DataFrame({cat_col: agg_series.index, col: agg_series.values})
                     n_bars = len(bar_data)
                 else:
                     n_bars = 15  # histogram bins
@@ -451,7 +486,7 @@ class InsightVisualizer:
                     ax.grid(axis="y", alpha=0.3, linestyle="--")
                     ax.set_axisbelow(True)
                     plt.tight_layout()
-                    st.pyplot(fig, use_container_width=True, clear_figure=True)
+                    show_centered_plot(fig, use_container_width=True, clear_figure=True)
     
     def render_correlation_analysis(self):
         """Render correlation analysis for numeric columns"""
@@ -491,7 +526,7 @@ class InsightVisualizer:
                        annot_kws={"size": 8})
             ax.set_title("Numeric Variables Correlation Matrix", fontsize=10, fontweight="bold")
             plt.tight_layout()
-            st.pyplot(fig, use_container_width=True)
+            show_centered_plot(fig, use_container_width=True)
     
     def render_trend_analysis(self):
         """Render trend analysis if date and numeric columns exist"""
@@ -520,7 +555,7 @@ class InsightVisualizer:
                 ax.grid(True, alpha=0.3)
                 plt.xticks(rotation=45)
                 plt.tight_layout()
-                st.pyplot(fig, use_container_width=True)
+                show_centered_plot(fig, use_container_width=True)
         except Exception as e:
             logger.warning(f"Could not render trend analysis: {e}")
     
@@ -536,6 +571,10 @@ class InsightVisualizer:
         # Focus on key categorical columns with reasonable cardinality
         key_categorical = [col for col in self.insights.categorical_cols 
                           if cat_insights[col]["unique_count"] <= 20][:3]
+        
+        # Fallback if no low-cardinality categorical columns exist, but there are categorical columns
+        if not key_categorical and self.insights.categorical_cols:
+            key_categorical = self.insights.categorical_cols[:1]
         
         if key_categorical:
             st.subheader(" Category Distributions (Pie Charts)")
@@ -559,10 +598,15 @@ class InsightVisualizer:
                         value_col = possible_value_cols[0]
                 
                 if value_col:
-                    cat_data = self.df[[col, value_col]].drop_duplicates().sort_values(value_col, ascending=True)
-                    pie_data = cat_data.set_index(col)[value_col]
+                    pie_data = self._aggregate_by_category(col, value_col).sort_values(ascending=False)
                 else:
                     pie_data = self.df[col].astype(str).value_counts()
+                
+                # Group high-cardinality items (if > 10 categories) into "Other"
+                if len(pie_data) > 10:
+                    top_n = pie_data.head(9)
+                    other_sum = pie_data.iloc[9:].sum()
+                    pie_data = pd.concat([top_n, pd.Series({"Other": other_sum})])
                 
                 if len(pie_data) == 0:
                     continue
@@ -570,13 +614,13 @@ class InsightVisualizer:
                 # ── Adaptive figsize & font scale by slice count ─────────────
                 n_slices = len(pie_data)
                 if use_full_width:
-                    fig_w = fig_h = max(6.0, min(9.0, 5.0 + n_slices * 0.2))
+                    fig_w = fig_h = 0.5 * max(6.0, min(9.0, 5.0 + n_slices * 0.2))
                 else:
-                    fig_w = fig_h = max(4.2, min(6.5, 3.8 + n_slices * 0.18))
+                    fig_w = fig_h = 0.5 * max(4.2, min(6.5, 3.8 + n_slices * 0.18))
 
-                label_fs  = max(6, min(10, 11 - n_slices // 3))
-                pct_fs    = max(6, min(9,  10 - n_slices // 4))
-                title_fs  = 12 if use_full_width else 10
+                label_fs  = max(5, min(8, 9 - n_slices // 3))
+                pct_fs    = max(5, min(7, 8 - n_slices // 4))
+                title_fs  = 10 if use_full_width else 8
                 # ─────────────────────────────────────────────────────────────
 
                 ctx = pie_containers[0] if use_full_width else pie_containers[idx % 3]
@@ -630,18 +674,311 @@ class InsightVisualizer:
                     ]
                     ax.legend(
                         wedges, legend_labels,
-                        title="Category", title_fontsize=max(6, pct_fs - 1),
+                        title="Category", title_fontsize=max(5, pct_fs - 1),
                         loc="lower center",
-                        bbox_to_anchor=(0.5, -0.18),
+                            bbox_to_anchor=(0.5, -0.25),
                         ncol=min(3, n_slices),
-                        fontsize=max(5, pct_fs - 1),
+                        fontsize=max(4, pct_fs - 2),
                         frameon=True,
                         framealpha=0.85,
                         edgecolor=GRID_LINE,
                     )
                     plt.tight_layout()
-                    st.pyplot(fig, use_container_width=True, clear_figure=True)
+                    if use_full_width:
+                        show_centered_plot(fig, use_container_width=True, clear_figure=True, ratio=0.45)
+                    else:
+                        st.pyplot(fig, use_container_width=False, clear_figure=True)
     
+    def render_line_chart(self):
+        """Render a line / area chart for ordered/time-series categorical data"""
+        if not self.insights.numeric_cols:
+            return
+        num_col = self.insights.numeric_cols[0]
+        
+        # Support multi-series line chart if multiple categorical columns are present
+        if len(self.insights.categorical_cols) >= 2:
+            c1 = self.insights.categorical_cols[0]
+            c2 = self.insights.categorical_cols[1]
+            
+            # Sort by time-series column c1 and aggregate values
+            num_lower = str(num_col).lower()
+            agg_func = 'mean' if any(x in num_lower for x in ["avg", "mean", "score", "pct", "ratio", "percentage"]) else 'sum'
+            plot_df = self.df.groupby([c1, c2])[num_col].agg(agg_func).reset_index()
+
+            if self._is_year_column(c1, plot_df[c1]):
+                plot_df["_sort_key"] = pd.to_numeric(plot_df[c1], errors="coerce")
+                plot_df = plot_df.sort_values("_sort_key").drop(columns=["_sort_key"])
+            else:
+                plot_df = plot_df.sort_values(c1)
+                
+            n = plot_df[c1].nunique()
+            fig_w = max(9, min(16, 7 + n * 0.35))
+            fig, ax = plt.subplots(figsize=(fig_w, 5))
+            
+            # Draw line plot
+            sns.lineplot(data=plot_df, x=c1, y=num_col, hue=c2, ax=ax, marker='o', linewidth=2.5, palette=CHART_COLORS)
+            
+            ax.set_title(f"{num_col} by {c1} and {c2}", fontsize=11, fontweight='bold', pad=14)
+            ax.set_ylabel(num_col, fontsize=9, fontweight='bold')
+            ax.set_xlabel(c1, fontsize=9, fontweight='bold')
+            ax.grid(axis='y', alpha=0.25, linestyle='--')
+            ax.legend(title=c2, fontsize=8, title_fontsize=9)
+            plt.xticks(rotation=45 if n > 8 else 0)
+            plt.tight_layout()
+            show_centered_plot(fig, use_container_width=True, clear_figure=True)
+            return
+
+        cat_col = self.insights.categorical_cols[0] if self.insights.categorical_cols else None
+
+        if cat_col:
+            agg_series = self._aggregate_by_category(cat_col, num_col)
+            plot_df = pd.DataFrame({cat_col: agg_series.index, num_col: agg_series.values})
+            plot_df = self._sort_bar_data_by_category(plot_df, cat_col, num_col)
+            x_vals = plot_df[cat_col].astype(str).values
+            y_vals = plot_df[num_col].values.astype(float)
+        else:
+            x_vals = self.df.index.astype(str).values
+            y_vals = self.df[num_col].values.astype(float)
+
+        n = len(x_vals)
+
+        # Adaptive figsize & font scale by series count
+        if n > 10:
+            fig_w = max(9, min(16, 7 + n * 0.35))
+            fig_h = 5.5
+        else:
+            fig_w = 7.5
+            fig_h = 5.0
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+
+        # Area fill + line + markers
+        ax.fill_between(range(n), y_vals, alpha=0.13, color=PRIMARY)
+        ax.plot(range(n), y_vals, marker='o', linewidth=2.5,
+                color=PRIMARY, markersize=7,
+                markerfacecolor=ACCENT2, markeredgecolor=PRIMARY,
+                markeredgewidth=1.5, zorder=3)
+
+        label_fs = max(7, min(9, 11 - n // 5))
+        y_range = float(y_vals.max() - y_vals.min()) if y_vals.max() != y_vals.min() else 1.0
+        base_offset = max(12, int(30 - n * 0.5))
+
+        for i, (xi, yi) in enumerate(zip(range(n), y_vals)):
+            above = (i % 2 == 0) if n > 10 else True
+            vert_offset = base_offset if above else -base_offset - 8
+            va = 'bottom' if above else 'top'
+
+            ax.annotate(
+                f"{int(yi):,}",
+                xy=(xi, yi),
+                xytext=(0, vert_offset),
+                textcoords='offset points',
+                ha='center',
+                va=va,
+                fontsize=label_fs,
+                fontweight='bold',
+                color=TEXT_MAIN,
+                zorder=5,
+                bbox=dict(
+                    boxstyle='round,pad=0.25',
+                    facecolor='white',
+                    edgecolor=GRID_LINE,
+                    linewidth=0.7,
+                    alpha=0.88,
+                ),
+            )
+
+        y_min = float(y_vals.min())
+        y_max = float(y_vals.max())
+        padding = y_range * 0.22 if n <= 10 else y_range * 0.28
+        ax.set_ylim(max(0, y_min - y_range * 0.08), y_max + padding)
+
+        ax.set_xticks(range(n))
+        rotation = 45 if n > 8 else 0
+        ax.set_xticklabels(
+            x_vals, rotation=rotation,
+            ha='right' if rotation else 'center', fontsize=max(7, 9 - n // 8)
+        )
+        ax.set_title(
+            f"{num_col} — Line / Area Chart" + (f" by {cat_col}" if cat_col else ""),
+            fontsize=12, fontweight='bold', pad=14
+        )
+        ax.set_ylabel(num_col, fontsize=9)
+        ax.set_xlabel(cat_col if cat_col else "", fontsize=9)
+        ax.grid(axis='y', alpha=0.25, linestyle='--')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        plt.tight_layout(pad=1.5)
+        show_centered_plot(fig, use_container_width=True, clear_figure=True)
+
+    def render_grouped_bar(self):
+        """Render a grouped bar chart for 2 categorical columns and 1 numeric column"""
+        if len(self.insights.categorical_cols) < 2 or not self.insights.numeric_cols:
+            self.render_numeric_analysis()
+            return
+        
+        c1 = self.insights.categorical_cols[0]
+        c2 = self.insights.categorical_cols[1]
+        val = self.insights.numeric_cols[0]
+        
+        # Limit cardinality of c1 to top 15 to keep the chart clean
+        top_c1 = self.df[c1].value_counts().head(15).index
+        plot_df = self.df[self.df[c1].isin(top_c1)].copy()
+        
+        n_groups = plot_df[c1].nunique()
+        fig_w = max(8, min(16, 6 + n_groups * 0.5))
+        fig, ax = plt.subplots(figsize=(fig_w, 5))
+        
+        sns.barplot(data=plot_df, x=c1, y=val, hue=c2, ax=ax, palette=CHART_COLORS)
+        
+        ax.set_title(f"{val} distribution of {c2} for each {c1}", fontsize=11, fontweight='bold')
+        ax.set_xlabel(c1, fontsize=9, fontweight='bold')
+        ax.set_ylabel(val, fontsize=9, fontweight='bold')
+        ax.grid(axis='y', alpha=0.3, linestyle='--')
+        ax.legend(title=c2, fontsize=8, title_fontsize=9)
+        plt.xticks(rotation=45 if n_groups > 6 else 0)
+        plt.tight_layout()
+        show_centered_plot(fig, use_container_width=True, clear_figure=True)
+
+    def render_horizontal_bar(self):
+        """Render a horizontal bar chart — best when category labels are long"""
+        if not self.insights.numeric_cols or not self.insights.categorical_cols:
+            self.render_numeric_analysis()
+            return
+        num_col = self.insights.numeric_cols[0]
+        cat_col = self.insights.categorical_cols[0]
+        agg_series = self._aggregate_by_category(cat_col, num_col).sort_values(ascending=True)
+        bar_df = pd.DataFrame({cat_col: agg_series.index, num_col: agg_series.values})
+        n = len(bar_df)
+        fig_h = max(4, min(12, 2.5 + n * 0.32))
+        fig, ax = plt.subplots(figsize=(9, fig_h))
+        colors = [CHART_COLORS[i % len(CHART_COLORS)] for i in range(n)]
+        bars = ax.barh(range(n), bar_df[num_col].values, color=colors, edgecolor=BG_PANEL, height=0.65)
+        ax.set_yticks(range(n))
+        ax.set_yticklabels(bar_df[cat_col].astype(str).values, fontsize=max(6, 9 - n // 8))
+        for bar in bars:
+            w = bar.get_width()
+            ax.text(w, bar.get_y() + bar.get_height() / 2.,
+                    f" {int(w):,}", va='center', fontsize=7, fontweight='bold', color=TEXT_MAIN)
+        ax.set_xlabel(num_col, fontsize=9)
+        ax.set_title(f"{num_col} by {cat_col} — Horizontal Bar", fontsize=11, fontweight='bold')
+        ax.grid(axis='x', alpha=0.3, linestyle='--')
+        plt.tight_layout()
+        show_centered_plot(fig, use_container_width=True, clear_figure=True)
+
+    def render_scatter(self):
+        """Render a scatter plot between the first two numeric columns"""
+        if len(self.insights.numeric_cols) < 2:
+            st.info("Scatter plot requires at least 2 numeric columns. Showing bar chart instead.")
+            self.render_numeric_analysis()
+            return
+        x_col, y_col = self.insights.numeric_cols[0], self.insights.numeric_cols[1]
+        color_col = self.insights.categorical_cols[0] if self.insights.categorical_cols else None
+        fig, ax = plt.subplots(figsize=(8, 5))
+        if color_col:
+            cats = self.df[color_col].astype(str).unique()
+            for i, cat in enumerate(cats):
+                mask = self.df[color_col].astype(str) == cat
+                ax.scatter(self.df.loc[mask, x_col], self.df.loc[mask, y_col],
+                           label=cat, color=CHART_COLORS[i % len(CHART_COLORS)], alpha=0.75, s=60)
+            ax.legend(fontsize=8, title=color_col, framealpha=0.8)
+        else:
+            ax.scatter(self.df[x_col], self.df[y_col], color=PRIMARY, alpha=0.75, s=60)
+        ax.set_xlabel(x_col, fontsize=9)
+        ax.set_ylabel(y_col, fontsize=9)
+        ax.set_title(f"{x_col} vs {y_col} — Scatter Plot", fontsize=11, fontweight='bold')
+        ax.grid(alpha=0.3, linestyle='--')
+        plt.tight_layout()
+        show_centered_plot(fig, use_container_width=True, clear_figure=True)
+
+    def render_donut(self):
+        """Render a donut chart (pie with hole) for categorical data"""
+        if not self.insights.categorical_cols:
+            st.info("Donut chart needs categorical data. Showing bar chart instead.")
+            self.render_numeric_analysis()
+            return
+        cat_col = self.insights.categorical_cols[0]
+        val_col = self.insights.numeric_cols[0] if self.insights.numeric_cols else None
+        if val_col:
+            pie_data = self._aggregate_by_category(cat_col, val_col).sort_values(ascending=False)
+        else:
+            pie_data = self.df[cat_col].astype(str).value_counts()
+            
+        # Group high-cardinality items (if > 10 categories) into "Other"
+        if len(pie_data) > 10:
+            top_n = pie_data.head(9)
+            other_sum = pie_data.iloc[9:].sum()
+            pie_data = pd.concat([top_n, pd.Series({"Other": other_sum})])
+            
+        n = len(pie_data)
+        fig_sz = 0.5 * max(5.5, min(8.5, 4.5 + n * 0.2))
+        fig, ax = plt.subplots(figsize=(fig_sz, fig_sz))
+        total = pie_data.sum()
+        colors = CHART_COLORS[:n]
+        wedges, texts, autotexts = ax.pie(
+            pie_data.values,
+            labels=pie_data.index.astype(str),
+            autopct=lambda pct: f"{int(round(pct/100*total)):,}\n({pct:.1f}%)",
+            startangle=90, colors=colors,
+            wedgeprops=dict(width=0.55),
+            pctdistance=0.75,
+            textprops={'fontsize': max(5, 8 - n // 3)}
+        )
+        for at in autotexts:
+            at.set_fontsize(max(5, 7 - n // 4))
+            at.set_fontweight('bold')
+            at.set_color('white')
+        ax.set_title(f"{cat_col} — Donut Chart", fontsize=10, fontweight='bold', pad=14)
+        ax.axis('equal')
+        plt.tight_layout()
+        show_centered_plot(fig, use_container_width=True, clear_figure=True, ratio=0.4)
+
+    def render_histogram(self):
+        """Render histogram(s) for numeric column distributions"""
+        if not self.insights.numeric_cols:
+            st.info("No numeric columns found for histogram.")
+            return
+        cols_to_plot = self.insights.numeric_cols[:3]
+        n_plots = len(cols_to_plot)
+        fig, axes = plt.subplots(1, n_plots, figsize=(5.5 * n_plots, 4.2))
+        if n_plots == 1:
+            axes = [axes]
+        for ax, col in zip(axes, cols_to_plot):
+            data = self.df[col].dropna()
+            n_bins = min(30, max(10, len(data) // 5))
+            ax.hist(data, bins=n_bins, color=PRIMARY, edgecolor=BG_PANEL, alpha=0.9, linewidth=0.8)
+            mean_v = data.mean()
+            ax.axvline(mean_v, color=ACCENT2, linestyle='--', linewidth=1.8, label=f'Mean: {mean_v:.1f}')
+            ax.legend(fontsize=8)
+            ax.set_title(f"{col} — Histogram", fontsize=10, fontweight='bold')
+            ax.set_xlabel(col, fontsize=8)
+            ax.set_ylabel('Frequency', fontsize=8)
+            ax.grid(axis='y', alpha=0.3, linestyle='--')
+        plt.tight_layout()
+        show_centered_plot(fig, use_container_width=True, clear_figure=True)
+
+    def render_heatmap(self):
+        """Render correlation heatmap (needs 2+ numeric columns) or a pivot heatmap"""
+        if len(self.insights.numeric_cols) >= 2:
+            self.render_correlation_analysis()
+        elif len(self.insights.categorical_cols) >= 2 and self.insights.numeric_cols:
+            # Pivot heatmap: cat1 × cat2 → numeric
+            c1, c2 = self.insights.categorical_cols[0], self.insights.categorical_cols[1]
+            val = self.insights.numeric_cols[0]
+            try:
+                pivot = self.df.pivot_table(index=c1, columns=c2, values=val, aggfunc='sum', fill_value=0)
+                fig, ax = plt.subplots(figsize=(max(6, len(pivot.columns) * 0.9), max(4, len(pivot) * 0.7)))
+                sns.heatmap(pivot, annot=True, fmt='g', cmap='Blues', ax=ax,
+                            linewidths=0.5, linecolor=GRID_LINE, annot_kws={'size': 8})
+                ax.set_title(f"{val} by {c1} × {c2} — Heatmap", fontsize=11, fontweight='bold')
+                plt.tight_layout()
+                show_centered_plot(fig, use_container_width=True, clear_figure=True)
+            except Exception as e:
+                logger.warning(f"Pivot heatmap failed: {e}")
+                self.render_numeric_analysis()
+        else:
+            st.info("Heatmap needs 2+ numeric or 2 categorical columns. Showing bar chart instead.")
+            self.render_numeric_analysis()
+
     def _decide_chart_type_with_llm(self, user_query: str) -> str:
         """Use LLM to dynamically decide the best chart type based on the user's question."""
         prompt = f"""You are an expert data visualization assistant.
@@ -677,52 +1014,79 @@ Respond with ONLY ONE word from the options above: bar, pie, trend, correlation,
 
     def render_insights(self, chart_type: str = "auto", user_query: str = None):
         """Main method to render all insights"""
-        # st.markdown("###  Dataset Insights & Analysis")
-        # st.markdown("Comprehensive analysis of your query results:")
-        
-        # Executive summary
+        # Executive summary always shown
         self.render_executive_summary()
-        
         st.divider()
 
+        # LLM-driven chart type selection when auto
         if chart_type == "auto" and user_query:
             llm_chart_type = self._decide_chart_type_with_llm(user_query)
             if llm_chart_type != "auto":
-                st.info(f" selecting  '{llm_chart_type}' chart based on your query.")
+                st.info(f" Selecting '{llm_chart_type}' chart based on your query.")
                 chart_type = llm_chart_type
 
+        # ── Dispatch to the correct renderer ─────────────────────────────────
         if chart_type == "bar":
-            if self.insights.numeric_cols:
+            if len(self.insights.categorical_cols) >= 2 and self.insights.numeric_cols:
+                self.render_grouped_bar()
+            elif self.insights.numeric_cols:
                 self.render_numeric_analysis()
-            elif self.insights.categorical_cols:
-                st.info("No numeric columns found. Showing categorical pie charts instead.")
+            else:
+                st.info("No numeric columns found. Showing categorical distributions instead.")
                 self.render_categorical_analysis()
+
         elif chart_type == "pie":
             if self.insights.categorical_cols:
                 self.render_categorical_analysis()
-            elif self.insights.numeric_cols:
+            else:
                 st.info("No categorical columns found. Showing numeric bar charts instead.")
                 self.render_numeric_analysis()
+
+        elif chart_type == "donut":
+            self.render_donut()
+
+        elif chart_type in ("line", "area"):
+            self.render_line_chart()
+
+        elif chart_type == "horizontal_bar":
+            self.render_horizontal_bar()
+
+        elif chart_type == "scatter":
+            self.render_scatter()
+
+        elif chart_type == "histogram":
+            self.render_histogram()
+
+        elif chart_type == "heatmap":
+            self.render_heatmap()
+
         elif chart_type == "trend":
             if self.insights.date_cols and self.insights.numeric_cols:
                 self.render_trend_analysis()
             else:
-                st.info("Missing date or numeric columns for trend analysis. Showing all relevant charts.")
-                chart_type = "auto"
+                st.info("Missing date or numeric columns for trend. Showing line chart instead.")
+                self.render_line_chart()
+
         elif chart_type == "correlation":
             if len(self.insights.numeric_cols) >= 2:
                 self.render_correlation_analysis()
             else:
-                st.info("Need at least two numeric columns for correlation analysis. Showing all relevant charts.")
+                st.info("Need 2+ numeric columns for correlation. Showing all relevant charts.")
                 chart_type = "auto"
 
         if chart_type == "auto":
-            if self.insights.numeric_cols:
-                self.render_numeric_analysis()
+            if len(self.insights.categorical_cols) >= 2 and self.insights.numeric_cols:
+                self.render_grouped_bar()
                 st.divider()
-            if self.insights.categorical_cols:
-                self.render_categorical_analysis()
+                self.render_heatmap()
                 st.divider()
+            else:
+                if self.insights.numeric_cols:
+                    self.render_numeric_analysis()
+                    st.divider()
+                if self.insights.categorical_cols:
+                    self.render_categorical_analysis()
+                    st.divider()
             if len(self.insights.numeric_cols) >= 2:
                 self.render_correlation_analysis()
                 st.divider()
