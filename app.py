@@ -1199,7 +1199,7 @@ def get_predictive_data():
             )
 
         df_high_risk = pd.DataFrame()
-        ac_col = get_actual_col("Ac_no", columns)
+        ac_col = get_actual_col("account_number", columns)
         if ac_col and score_col:
             first = get_actual_col("first_name", columns) or get_actual_col("pd_first_name", columns)
             last = get_actual_col("last_name", columns) or get_actual_col("pd_last_name", columns)
@@ -1209,7 +1209,7 @@ def get_predictive_data():
             else:
                 name_expr = ac_col
 
-            state_col = get_actual_col("State", columns) or get_actual_col("PD_State", columns) or "NULL"
+            state_col = get_actual_col("state", columns) or get_actual_col("pd_state", columns) or "NULL"
             chapter_col = get_actual_col("chapter", columns) or "NULL"
             status_col = get_actual_col("status", columns) or "NULL"
 
@@ -1402,7 +1402,7 @@ def get_filtered_cases(state_filter=None, chapter_filter=None, status_filter=Non
         consumer_col = get_actual_col("consumer_type", columns)
         date_col = get_actual_col("Open_date", columns)
         score_col = get_actual_col("match_score", columns) or "0"
-        ac_col = get_actual_col("Ac_no", columns) or "Ac_no"
+        ac_col = get_actual_col("account_number", columns) or "account_number"
 
         first = get_actual_col("first_name", columns) or get_actual_col("pd_first_name", columns)
         last = get_actual_col("last_name", columns) or get_actual_col("pd_last_name", columns)
@@ -1462,7 +1462,7 @@ def get_case_detail_by_id(case_number):
         cursor = conn.cursor()
         cursor.execute(f"PRAGMA table_info({table_name});")
         columns = {row[1] for row in cursor.fetchall()}
-        ac_col = get_actual_col("Ac_no", columns) or "Ac_no"
+        ac_col = get_actual_col("account_number", columns) or "account_number"
         
         query = f"SELECT * FROM {table_name} WHERE {ac_col} = '{case_number}' OR {ac_col} = {case_number} LIMIT 1"
         df_detail = pd.read_sql_query(query, conn)
@@ -1630,10 +1630,26 @@ def main():
 
     # Initialize states
     if "data_in_db" not in st.session_state:
-        st.session_state.data_in_db = False
+        try:
+            conn = sqlite3.connect("data.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='uploaded_data'")
+            has_table = cursor.fetchone() is not None
+            if has_table:
+                cursor.execute("SELECT COUNT(1) FROM uploaded_data")
+                has_rows = cursor.fetchone()[0] > 0
+                st.session_state.data_in_db = has_rows
+            else:
+                st.session_state.data_in_db = False
+            conn.close()
+        except Exception:
+            st.session_state.data_in_db = False
 
     if "last_uploaded_file_name" not in st.session_state:
-        st.session_state.last_uploaded_file_name = None
+        if st.session_state.data_in_db:
+            st.session_state.last_uploaded_file_name = "data.db"
+        else:
+            st.session_state.last_uploaded_file_name = None
 
     if "actual_schema" not in st.session_state:
         if st.session_state.data_in_db:
@@ -1891,7 +1907,7 @@ def main():
         uploaded_file = st.file_uploader("Upload CSV database...", type=["csv"], help="Upload bankruptcy CSV data. Columns will be parsed dynamically.")
 
         if uploaded_file is not None:
-            file_changed = uploaded_file.name != st.session_state.last_uploaded_file_name
+            file_changed = (uploaded_file.name != st.session_state.last_uploaded_file_name) or not st.session_state.data_in_db
 
             if file_changed:
                 with st.spinner("Processing dataset..."):
@@ -2030,7 +2046,7 @@ def main():
                     _narrative = (
                         f"Your full portfolio contains <strong>{_total:,} bankruptcy cases</strong>. "
                         f"<strong>{_active:,} ({_active_pct}%)</strong> are currently active. "
-                        f"Use the filters in the left panel to drill into a specific client, state, chapter, or status. "
+                        # f"Use the filters in the left panel to drill into a specific client, state, chapter, or status. "
                     )
 
                 if _top_ch_num:
@@ -2466,7 +2482,7 @@ def main():
                                 last_name_f = get_actual_col('last_name', case_row.keys()) or get_actual_col('pd_last_name', case_row.keys())
                                 state_f = get_actual_col('state', case_row.keys())
                                 city_f = get_actual_col('city', case_row.keys())
-                                ac_f = get_actual_col('Ac_no', case_row.keys())
+                                ac_f = get_actual_col('account_number', case_row.keys())
                                 
                                 name_val = f"{case_row.get(first_name_f, '')} {case_row.get(last_name_f, '')}".strip() if (first_name_f and last_name_f) else "N/A"
                                 

@@ -1,517 +1,517 @@
 {
   "schema_version": "1.0",
   "table_name": "uploaded_data",
-  "description": "Schema for bankruptcy4 and legal case record tracking, optimized for LLM retrieval.",
+  "description": "Schema for bankruptcy and legal case record tracking, optimized for LLM retrieval.",
   "columns": [
     {
       "name": "account_number",
       "type": "string",
-      "description": "Debtor account number. A unique reference identifier for the financial account involved in the bankruptcy action."
+      "description": "Unique account identifier associated with the debtor. Use this field to locate all bankruptcy records, legal notices, status changes, and case activity related to a specific financial account."
     },
     {
       "name": "client_name",
       "type": "string",
-      "description": "The institution or creditor client associated with the bankruptcy case. Identifies the primary customer/client record."
+      "description": "Name or code of the creditor, lender, institution, or client that owns or services the account involved in the bankruptcy case. Examples include VP, SYF, etc. Commonly used for client-level reporting and analysis. Map user terms 'client', 'VP', 'client code' to this column."
     },
     {
       "name": "open_date",
       "type": "date",
-      "description": "The date on which the legal case or account tracking was initiated in the system. Formatted strictly as YYYY-MM-DD."
+      "description": "Date when the bankruptcy monitoring record or account tracking entry was first created in the system. Format: YYYY-MM-DD."
     },
     {
       "name": "first_name",
       "type": "string",
-      "description": "The primary consumer/debtor's legal first name."
+      "description": "First name of the account holder or debtor. Used for identity matching and debtor lookup."
     },
     {
       "name": "middle_name",
       "type": "string",
-      "description": "The primary consumer/debtor's middle name or middle initial (if available)."
+      "description": "Middle name of the account holder or debtor."
     },
     {
       "name": "last_name",
       "type": "string",
-      "description": "The primary consumer/debtor's legal last name."
+      "description": "Last name (surname) of the account holder or debtor."
     },
     {
       "name": "ssn",
       "type": "string",
-      "description": "The Social Security Number of the primary consumer/debtor, formatted as a string."
+      "description": "Social Security Number of the account holder. Used for identity verification and matching."
     },
     {
       "name": "address_line_1",
       "type": "string",
-      "description": "Primary consumer/debtor's street address line 1."
+      "description": "Primary street address line 1 of the account holder."
     },
     {
       "name": "address_line_2",
       "type": "string",
-      "description": "Primary consumer/debtor's apartment, unit, suite, or additional address line 2."
+      "description": "Secondary address line 2 of the account holder (e.g., apartment, suite number)."
     },
     {
       "name": "city",
       "type": "string",
-      "description": "The city of residence of the primary consumer/debtor."
+      "description": "City of residence for the account holder or debtor."
     },
     {
       "name": "state",
       "type": "string",
-      "description": "The 2-letter standard US state abbreviation for the primary consumer/debtor's residence."
+      "description": "U.S. state abbreviation where the debtor resides or where the case was filed. Used for geographic filtering and analysis."
     },
     {
       "name": "zipcode",
       "type": "string",
-      "description": "The postal zip code of the primary consumer/debtor's address."
+      "description": "Postal ZIP code for the account holder's address."
     },
     {
       "name": "record_type",
       "type": "string",
-      "description": "Status category representing the current record stage. Allowed values: New, Closed, Reopened, Update."
+      "description": "Lifecycle state of the bankruptcy record. Typical values include New, Update, Reopened, or Closed. Useful for identifying newly received filings, updates, or completed cases."
     },
     {
       "name": "match_code",
       "type": "string",
-      "description": "Code indicating the quality of match (e.g. name, SSN, or address alignment)."
+      "description": "Code describing how the bankruptcy record was matched to the account or consumer. Values include P1, P2, P3 (primary matches) and M1, M2, M3 (manual matches). May represent matching based on SSN, name, address, or a combination of identifying attributes."
     },
     {
       "name": "match_score",
       "type": "integer",
-      "description": "Confidence score representing the quality of matching, ranging from 0 (no match) to 100 (perfect match)."
+      "description": "Numeric confidence score indicating how accurately the bankruptcy filing matches the consumer or account. Higher values indicate stronger matching confidence."
     },
     {
       "name": "consumer_id",
       "type": "string",
-      "description": "Unique system identifier for the primary consumer."
+      "description": "Unique identifier assigned to the consumer or debtor in the system."
     },
     {
       "name": "consumer_type",
       "type": "string",
-      "description": "The entity classification of the consumer. Allowed values: Corporate, SME, Individual, Business, Partnership, Trust."
+      "description": "Classification of the debtor or consumer associated with the bankruptcy filing. Examples include Individual, Business, Corporate, Partnership, Trust, or SME."
     },
     {
       "name": "notification_number",
       "type": "string",
-      "description": "Reference number of the legal notification or case notice."
+      "description": "Unique notification identifier for the bankruptcy notice or alert issued."
     },
     {
       "name": "notice_type",
       "type": "string",
-      "description": "The classification/type of bankruptcy notice received (e.g. Chapter 7 filing notice)."
+      "description": "Type of bankruptcy notice, court filing, or legal notification received. Examples include bankruptcy filing notices, discharge notices, dismissal notices, conversion notices, or creditor meeting notices."
     },
     {
       "name": "case_number",
       "type": "string",
-      "description": "The court docket number assigned to the legal bankruptcy proceeding (e.g., 21-12345)."
+      "description": "Official bankruptcy court case number used to uniquely identify the legal proceeding. Multiple notices and events may be associated with the same case number."
     },
     {
       "name": "chapter",
       "type": "string",
-      "description": "The specific chapter of the US Bankruptcy Code filed. Common chapters: 7, 11, 13."
+      "description": "Current bankruptcy chapter under which the case is proceeding. Common values include 7 (liquidation), 11 (reorganization), and 13 (individual repayment plan)."
     },
     {
       "name": "original_chapter",
       "type": "string",
-      "description": "The initial chapter of the US Bankruptcy Code under which the case was first filed, before any subsequent conversion."
+      "description": "Initial bankruptcy chapter under which the case was originally filed before any court-approved conversion to another chapter."
     },
     {
       "name": "date_filed",
       "type": "date",
-      "description": "The date the bankruptcy case was officially filed with the US bankruptcy court. Formatted strictly as YYYY-MM-DD."
+      "description": "Date when the bankruptcy petition was officially filed with the court. Format: YYYY-MM-DD. Use this column for yearly/annual/monthly trend analysis using strftime('%Y', date_filed)."
     },
     {
       "name": "conversion_date",
       "type": "date",
-      "description": "The date the bankruptcy case was converted from the original chapter to a new chapter. Formatted strictly as YYYY-MM-DD."
+      "description": "Date on which the bankruptcy case was converted from one chapter to another. Format: YYYY-MM-DD."
     },
     {
       "name": "status",
       "type": "string",
-      "description": "The current legal status of the case. Allowed values (case-sensitive): Active, Closed, Discharged, Dismissed, Converted, Pending."
+      "description": "Current legal status of the bankruptcy case. Common values include Active, Pending, Converted, Discharged, Dismissed, or Closed."
     },
     {
       "name": "status_date",
       "type": "date",
-      "description": "The date when the current status was updated or finalized. Formatted strictly as YYYY-MM-DD."
+      "description": "Date on which the current case status became effective or was officially recorded by the court."
     },
     {
       "name": "pd_ssn",
       "type": "string",
-      "description": "Primary Debtor Social Security Number (SSN)."
+      "description": "Social Security Number of the primary debtor (PD)."
     },
     {
       "name": "pd_first_name",
       "type": "string",
-      "description": "Primary Debtor first name."
+      "description": "First name of the primary debtor (PD)."
     },
     {
       "name": "pd_middle_name",
       "type": "string",
-      "description": "Primary Debtor details - Middle Name. Extracted legal entity information."
+      "description": "Middle name of the primary debtor (PD)."
     },
     {
       "name": "pd_last_name",
       "type": "string",
-      "description": "Primary Debtor last name."
+      "description": "Last name (surname) of the primary debtor (PD)."
     },
     {
       "name": "pd_suffix",
       "type": "string",
-      "description": "Primary Debtor details - Suffix. Extracted legal entity information."
+      "description": "Name suffix of the primary debtor (e.g., Jr., Sr., III)."
     },
     {
       "name": "pd_aka",
       "type": "string",
-      "description": "Primary Debtor details - Aka. Extracted legal entity information."
+      "description": "Alternate name (Also Known As) used by the primary debtor. Useful when matching bankruptcy records filed under different names or aliases."
     },
     {
       "name": "pd_aka2",
       "type": "string",
-      "description": "Primary Debtor details - Aka2. Extracted legal entity information."
+      "description": "Second alternate name (Also Known As) for the primary debtor."
     },
     {
       "name": "pd_dba",
       "type": "string",
-      "description": "Primary Debtor details - Dba. Extracted legal entity information."
+      "description": "Business name (Doing Business As) associated with the primary debtor. Commonly used when an individual or entity operates under a trade name."
     },
     {
       "name": "pd_dba2",
       "type": "string",
-      "description": "Primary Debtor details - Dba2. Extracted legal entity information."
+      "description": "Second business name (Doing Business As) associated with the primary debtor."
     },
     {
       "name": "pd_address_line_1",
       "type": "string",
-      "description": "Primary Debtor details - Address Line 1. Extracted legal entity information."
+      "description": "Primary address line 1 for the primary debtor."
     },
     {
       "name": "pd_address_line_2",
       "type": "string",
-      "description": "Primary Debtor details - Address Line 2. Extracted legal entity information."
+      "description": "Secondary address line 2 for the primary debtor."
     },
     {
       "name": "pd_city",
       "type": "string",
-      "description": "Primary Debtor details - City. Extracted legal entity information."
+      "description": "City of residence for the primary debtor."
     },
     {
       "name": "pd_state",
       "type": "string",
-      "description": "Primary Debtor details - State. Extracted legal entity information."
+      "description": "State of residence for the primary debtor."
     },
     {
       "name": "pd_zipcode",
       "type": "string",
-      "description": "Primary Debtor details - Zipcode. Extracted legal entity information."
+      "description": "ZIP code for the primary debtor's address."
     },
     {
       "name": "pd_phone",
       "type": "string",
-      "description": "Primary Debtor contact phone number."
+      "description": "Phone number for the primary debtor."
     },
     {
       "name": "sd_ssn",
       "type": "string",
-      "description": "Secondary Debtor Social Security Number (SSN)."
+      "description": "Social Security Number of the secondary debtor (SD)."
     },
     {
       "name": "sd_first_name",
       "type": "string",
-      "description": "Secondary Debtor first name."
+      "description": "First name of the secondary debtor (SD)."
     },
     {
       "name": "sd_middle_name",
       "type": "string",
-      "description": "Secondary Debtor details - Middle Name. Extracted legal entity information."
+      "description": "Middle name of the secondary debtor (SD)."
     },
     {
       "name": "sd_last_name",
       "type": "string",
-      "description": "Secondary Debtor last name."
+      "description": "Last name (surname) of the secondary debtor (SD)."
     },
     {
       "name": "sd_suffix",
       "type": "string",
-      "description": "Secondary Debtor details - Suffix. Extracted legal entity information."
+      "description": "Name suffix of the secondary debtor (e.g., Jr., Sr.)."
     },
     {
       "name": "sd_aka",
       "type": "string",
-      "description": "Secondary Debtor details - Aka. Extracted legal entity information."
+      "description": "Alternate name (Also Known As) for the secondary debtor."
     },
     {
       "name": "sd_aka2",
       "type": "string",
-      "description": "Secondary Debtor details - Aka2. Extracted legal entity information."
+      "description": "Second alternate name (Also Known As) for the secondary debtor."
     },
     {
       "name": "sd_dba",
       "type": "string",
-      "description": "Secondary Debtor details - Dba. Extracted legal entity information."
+      "description": "Business name (Doing Business As) for the secondary debtor."
     },
     {
       "name": "sd_dba2",
       "type": "string",
-      "description": "Secondary Debtor details - Dba2. Extracted legal entity information."
+      "description": "Second business name (Doing Business As) for the secondary debtor."
     },
     {
       "name": "sd_address_line_1",
       "type": "string",
-      "description": "Secondary Debtor details - Address Line 1. Extracted legal entity information."
+      "description": "Primary address line 1 for the secondary debtor."
     },
     {
       "name": "sd_address_line_2",
       "type": "string",
-      "description": "Secondary Debtor details - Address Line 2. Extracted legal entity information."
+      "description": "Secondary address line 2 for the secondary debtor."
     },
     {
       "name": "sd_city",
       "type": "string",
-      "description": "Secondary Debtor details - City. Extracted legal entity information."
+      "description": "City of residence for the secondary debtor."
     },
     {
       "name": "sd_state",
       "type": "string",
-      "description": "Secondary Debtor details - State. Extracted legal entity information."
+      "description": "State of residence for the secondary debtor."
     },
     {
       "name": "sd_zipcode",
       "type": "string",
-      "description": "Secondary Debtor details - Zipcode. Extracted legal entity information."
+      "description": "ZIP code for the secondary debtor's address."
     },
     {
       "name": "sd_phone",
       "type": "string",
-      "description": "Secondary Debtor contact phone number."
+      "description": "Phone number for the secondary debtor."
     },
     {
       "name": "judge_name",
       "type": "string",
-      "description": "Name of the presiding judge"
+      "description": "Name of the bankruptcy judge assigned to oversee and make rulings in the case."
     },
     {
       "name": "prose_indicator",
       "type": "boolean",
-      "description": "Indicates if the party is representing themselves"
+      "description": "Indicates whether the debtor is self-represented without legal counsel. True = debtor is representing themselves (pro se); False = represented by an attorney."
     },
     {
       "name": "attorney_ssn",
       "type": "string",
-      "description": "Attorney/Counsel details - Ssn. Legal representation info."
+      "description": "SSN or identification number of the attorney representing the debtor."
     },
     {
       "name": "attorney_first_name",
       "type": "string",
-      "description": "Attorney's legal first name."
+      "description": "First name of the attorney representing the debtor."
     },
     {
       "name": "attorney_middle_name",
       "type": "string",
-      "description": "Attorney/Counsel details - Middle Name. Legal representation info."
+      "description": "Middle name of the attorney representing the debtor."
     },
     {
       "name": "attorney_last_name",
       "type": "string",
-      "description": "Attorney's legal last name."
+      "description": "Last name of the attorney representing the debtor."
     },
     {
       "name": "attorney_suffix",
       "type": "string",
-      "description": "Attorney/Counsel details - Suffix. Legal representation info."
+      "description": "Name suffix of the attorney (e.g., Jr., Esq.)."
     },
     {
       "name": "attorney_aka",
       "type": "string",
-      "description": "Attorney/Counsel details - Aka. Legal representation info."
+      "description": "Alternate name (Also Known As) for the attorney."
     },
     {
       "name": "attorney_aka2",
       "type": "string",
-      "description": "Attorney/Counsel details - Aka2. Legal representation info."
+      "description": "Second alternate name for the attorney."
     },
     {
       "name": "attorney_dba",
       "type": "string",
-      "description": "Attorney's Doing Business As (DBA) name or Law Firm name."
+      "description": "Firm or business name (Doing Business As) used by the attorney or law firm representing the debtor. Use for attorney/lawyer grouping and analysis."
     },
     {
       "name": "attorney_dba2",
       "type": "string",
-      "description": "Attorney's Doing Business As (DBA) name or Law Firm name."
+      "description": "Second firm name (Doing Business As) for the attorney."
     },
     {
       "name": "attorney_address_line_1",
       "type": "string",
-      "description": "Attorney/Counsel details - Address Line 1. Legal representation info."
+      "description": "Primary address line 1 for the attorney's office."
     },
     {
       "name": "attorney_address_line_2",
       "type": "string",
-      "description": "Attorney/Counsel details - Address Line 2. Legal representation info."
+      "description": "Secondary address line 2 for the attorney's office."
     },
     {
       "name": "attorney_city",
       "type": "string",
-      "description": "Attorney/Counsel details - City. Legal representation info."
+      "description": "City where the attorney's office is located."
     },
     {
       "name": "attorney_state",
       "type": "string",
-      "description": "Attorney/Counsel details - State. Legal representation info."
+      "description": "State where the attorney's office is located."
     },
     {
       "name": "attorney_zipcode",
       "type": "string",
-      "description": "Attorney/Counsel details - Zipcode. Legal representation info."
+      "description": "ZIP code of the attorney's office address."
     },
     {
       "name": "attorney_phone",
       "type": "string",
-      "description": "Attorney/Counsel details - Phone. Legal representation info."
+      "description": "Phone number for the attorney's office."
     },
     {
       "name": "creditor_meeting_time",
       "type": "string",
-      "description": "Section 341 Meeting of Creditors scheduling details: Meeting of Creditors (341) scheduled time"
+      "description": "Scheduled date and/or time for the Section 341 Meeting of Creditors, where the debtor is questioned under oath regarding financial affairs and bankruptcy filings."
     },
     {
       "name": "creditor_address_line_1",
       "type": "string",
-      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting Address Line 1"
+      "description": "Primary address line 1 for the creditor or meeting location."
     },
     {
       "name": "creditor_address_line_2",
       "type": "string",
-      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting Address Line 2"
+      "description": "Secondary address line 2 for the creditor or meeting location."
     },
     {
       "name": "creditor_city",
       "type": "string",
-      "description": "Section 341 Meeting of Creditors scheduling details: City where the 341 Meeting of Creditors is scheduled (e.g. Chicago)"
+      "description": "City for the creditor's address or meeting location."
     },
     {
       "name": "creditor_state",
       "type": "string",
-      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting State"
+      "description": "State for the creditor's address or meeting location."
     },
     {
       "name": "creditor_zipcode",
       "type": "string",
-      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting Zipcode"
+      "description": "ZIP code for the creditor's address."
     },
     {
       "name": "creditor_phone",
       "type": "string",
-      "description": "Section 341 Meeting of Creditors scheduling details: 341 Meeting contact phone"
+      "description": "Phone number for the creditor."
     },
     {
       "name": "trustee_name",
       "type": "string",
-      "description": "Appointed case Trustee details: Name of the appointed trustee"
+      "description": "Name of the trustee appointed by the bankruptcy court to administer the case, review assets, and oversee compliance with bankruptcy procedures."
     },
     {
       "name": "trustee_address_line_1",
       "type": "string",
-      "description": "Appointed case Trustee details: Trustee Address Line 1"
+      "description": "Primary address line 1 for the trustee's office."
     },
     {
       "name": "trustee_address_line_2",
       "type": "string",
-      "description": "Appointed case Trustee details: Trustee Address Line 2"
+      "description": "Secondary address line 2 for the trustee's office."
     },
     {
       "name": "trustee_city",
       "type": "string",
-      "description": "Appointed case Trustee details: Trustee City"
+      "description": "City where the trustee's office is located."
     },
     {
       "name": "trustee_state",
       "type": "string",
-      "description": "Appointed case Trustee details: Trustee State"
+      "description": "State where the trustee's office is located."
     },
     {
       "name": "trustee_zipcode",
       "type": "string",
-      "description": "Appointed case Trustee details: Trustee Zipcode"
+      "description": "ZIP code of the trustee's office."
     },
     {
       "name": "trustee_phone",
       "type": "string",
-      "description": "Appointed case Trustee details: Trustee Phone Number"
+      "description": "Phone number for the trustee's office."
     },
     {
       "name": "court_id",
       "type": "string",
-      "description": "Jurisdiction Court details: Identifier for the specific court"
+      "description": "Unique identifier of the bankruptcy court responsible for handling the case."
     },
     {
       "name": "court_district",
       "type": "string",
-      "description": "Jurisdiction Court details: Court district jurisdiction"
+      "description": "Federal judicial district or court jurisdiction where the bankruptcy case was filed and is being administered."
     },
     {
       "name": "court_address_line_1",
       "type": "string",
-      "description": "Jurisdiction Court details: Court Address Line 1"
+      "description": "Primary address line 1 for the bankruptcy court."
     },
     {
       "name": "court_address_line_2",
       "type": "string",
-      "description": "Jurisdiction Court details: Court Address Line 2"
+      "description": "Secondary address line 2 for the bankruptcy court."
     },
     {
       "name": "court_city",
       "type": "string",
-      "description": "Jurisdiction Court details: Court City"
+      "description": "City where the bankruptcy court is located."
     },
     {
       "name": "court_state",
       "type": "string",
-      "description": "Jurisdiction Court details: Court State"
+      "description": "State where the bankruptcy court is located."
     },
     {
       "name": "court_zipcode",
       "type": "string",
-      "description": "Jurisdiction Court details: Court Zipcode"
+      "description": "ZIP code of the bankruptcy court address."
     },
     {
       "name": "court_phone",
       "type": "string",
-      "description": "Jurisdiction Court details: Court Phone Number"
+      "description": "Phone number for the bankruptcy court."
     },
     {
       "name": "confirmation_date",
       "type": "date",
-      "description": "Date the plan was confirmed in YYYY-MM-DD format"
+      "description": "Date on which the bankruptcy repayment or reorganization plan was officially confirmed and approved by the court."
     },
     {
       "name": "asset_indicator",
       "type": "boolean",
-      "description": "Indicates if the case involves assets"
+      "description": "Indicates whether the bankruptcy case involves reportable assets available for liquidation or distribution to creditors. True = asset case; False = no-asset case."
     },
     {
       "name": "before_open",
       "type": "string",
-      "description": "Indicator of status prior to opening"
+      "description": "Indicator or date value representing activity or status before the account was formally opened or monitored."
     },
     {
       "name": "sasf",
       "type": "string",
-      "description": "Internal record flag/identifier"
+      "description": "SASF indicator or code associated with the bankruptcy record."
     },
     {
       "name": "active_status",
       "type": "string",
-      "description": "Current active/inactive status flag"
+      "description": "Operational indicator showing whether the bankruptcy record is currently active, inactive, suspended, or otherwise available for processing."
     },
     {
       "name": "disposition_text",
       "type": "string",
-      "description": "Final result or judgment description"
+      "description": "Narrative description of the final outcome, ruling, resolution, or disposition of the bankruptcy case."
     },
     {
       "name": "poc_bar_date",
       "type": "date",
-      "description": "Proof of Claim (POC) bar date in YYYY-MM-DD format"
+      "description": "Deadline by which creditors must file a Proof of Claim (POC) with the bankruptcy court to participate in distributions from the bankruptcy estate."
     }
   ]
 }
