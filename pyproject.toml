@@ -20,4 +20,8 @@ dependencies = [
     "seaborn>=0.13.2",
     "streamlit>=1.56.0",
     "traceback2>=1.4.0",
+    "tiktoken>=0.13.0",
+    "litellm>=1.87.0",
+    "pip>=26.1.2",
+    "scikit-learn>=1.9.0",
 ]

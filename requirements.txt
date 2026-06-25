@@ -15,3 +15,6 @@ pysqlite3
 boto3
 python-dotenv
 tiktoken
+langchain-litellm 
+pip
+scikit-learn
