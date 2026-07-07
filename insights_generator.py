@@ -722,7 +722,7 @@ class InsightVisualizer:
         st.plotly_chart(fig, use_container_width=True, key=f"plotly_{self.viz_id}_{self._chart_idx()}")
 
     def render_grouped_bar(self):
-        """Render a professional Plotly grouped bar chart"""
+        """Render a professional Plotly grouped or stacked bar chart"""
         if len(self.insights.categorical_cols) < 2 or not self.insights.numeric_cols:
             self.render_numeric_analysis()
             return
@@ -738,15 +738,25 @@ class InsightVisualizer:
         y_label = val.replace('_', ' ').title()
         hue_label = c2.replace('_', ' ').title()
 
+        # Check if user explicitly asked for stacked bar chart
+        is_stacked = False
+        if hasattr(self, 'user_query') and self.user_query:
+            query_lower = self.user_query.lower()
+            if "stacked" in query_lower or "stack" in query_lower:
+                is_stacked = True
+
+        barmode_val = 'stack' if is_stacked else 'group'
+        title_prefix = "Stacked " if is_stacked else ""
+
         fig = px.bar(
             plot_df, x=c1, y=val, color=c2,
-            barmode='group',
+            barmode=barmode_val,
             color_discrete_sequence=CHART_COLORS,
             labels={c1: x_label, val: y_label, c2: hue_label},
         )
         fig.update_layout(
             **_plotly_layout(
-                title=f"{y_label} by {x_label} & {hue_label}",
+                title=f"{title_prefix}{y_label} by {x_label} & {hue_label}",
                 xaxis_title=x_label,
                 yaxis_title=y_label,
             )
@@ -965,6 +975,7 @@ Respond with ONLY ONE word from the options above: bar, pie, trend, correlation,
 
     def render_insights(self, chart_type: str = "auto", user_query: str = None):
         """Main method to render all insights"""
+        self.user_query = user_query
         # Executive summary always shown
         self.render_executive_summary()
         st.divider()

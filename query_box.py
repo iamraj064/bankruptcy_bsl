@@ -224,8 +224,14 @@ def clean_and_validate_suggestions(data, schema):
         q_str = str(q).strip()
         if not q_str or len(q_str) < 5:
             continue
-        q_lower = q_str.lower()
         
+        # Programmatic guard: replace any 'stacked' charts with regular/grouped bar charts
+        if "stacked" in q_str.lower():
+            q_str = re.sub(r"\bstacked\s+bar\s+chart(s)?\b", "Bar chart", q_str, flags=re.IGNORECASE)
+            q_str = re.sub(r"\bstacked\s+bar(s)?\b", "Bar", q_str, flags=re.IGNORECASE)
+            q_str = re.sub(r"\bstacked\b", "Bar", q_str, flags=re.IGNORECASE)
+
+        q_lower = q_str.lower()
         has_visual_kw = any(re.search(rf"\b{kw}\b", q_lower) for kw in visual_kws)
         if not has_visual_kw:
             # Prepend a default chart verb
@@ -441,7 +447,7 @@ def _generate_dynamic_prompt_suggestions(schema, conversation_memory, last_resul
                 "- Prioritize trend analysis, distributions, rankings, comparisons, correlations, "
                 "and geographic insights.\n"
                 "- Do NOT mention 'for the current client' or use other client-specific filters.\n"
-                "- For any suggestion comparing two categories, statuses, values, or items (e.g., comparing active vs closed, Chapter 7 vs 13, status vs year, or any comparison between 2), you MUST suggest a Bar Chart or Horizontal Bar Chart. Never suggest a pie chart, donut chart, line chart, or any other chart type for comparisons between 2.\n"
+                "- For any suggestion comparing two categories, statuses, values, or items (e.g., comparing active vs closed, Chapter 7 vs 13, status vs year, or any comparison between 2), you MUST suggest a Bar Chart or Horizontal Bar Chart. Never suggest a pie chart, donut chart, line chart, stacked bar chart, or any other chart type for comparisons between 2. DO NOT suggest 'stacked bar chart' or 'stacked barchart' under any circumstances.\n"
                 "- Use phrases such as:\n"
                 "  Bar chart of...\n"
                 "  Line chart showing...\n"
@@ -510,7 +516,7 @@ def _generate_dynamic_prompt_suggestions(schema, conversation_memory, last_resul
                 "- Must use actual columns, categories, or values from the dataset.\n"
                 "- Prioritize trend analysis, distributions, rankings, comparisons, correlations, "
                 "and geographic insights.\n"
-                "- For any suggestion comparing two categories, statuses, values, or items (e.g., comparing active vs closed, Chapter 7 vs 13, status vs year, or any comparison between 2), you MUST suggest a Bar Chart or Horizontal Bar Chart. Never suggest a pie chart, donut chart, line chart, or any other chart type for comparisons between 2.\n"
+                "- For any suggestion comparing two categories, statuses, values, or items (e.g., comparing active vs closed, Chapter 7 vs 13, status vs year, or any comparison between 2), you MUST suggest a Bar Chart or Horizontal Bar Chart. Never suggest a pie chart, donut chart, line chart, stacked bar chart, or any other chart type for comparisons between 2. DO NOT suggest 'stacked bar chart' or 'stacked barchart' under any circumstances.\n"
                 "- Use phrases such as:\n"
                 "  Bar chart of...\n"
                 "  Line chart showing...\n"
@@ -1061,6 +1067,7 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             "- Suffixes like 'wise' (e.g. yearwise, chapterwise, statewise, matchcodewise) specify fields that must be placed inside the 'group_by_fields' list (e.g. ['year'], ['chapter'], ['state'], ['match_code']).\n"
             "- Abbreviated filters like 'P2 matchcode' should set 'match_code' to 'P2'.\n"
             "- Client codes like 'VP yearwise', 'SYF distribution' should set 'client_name' to the code (e.g. 'VP') and group_by_fields to ['year']. Do NOT set match_code for client names.\n"
+            "- When the question asks for 'trends in/by [category]', 'breakdown of [category] over time', 'year-over-year trends in [category]' (e.g. 'trends in chapters', 'statewise trends', 'breakdown of status over years'), you MUST include both 'year' and the category (e.g. ['year', 'chapter'], ['year', 'state'], ['year', 'status']) in the 'group_by_fields' list so the visualizer can render a multi-series comparison chart.\n"
             "- If the user asks for a distribution or breakdown for a single year/date (e.g., 'VP 2024 distributions', '2024 cases distribution'), set 'date_or_year' to that year (e.g. '2024') and set 'group_by_fields' to ['month'] (instead of 'year') so that the distribution is shown across the months of that year.\n"
             "- Phrasings like 'NY attorney list' should set 'state' to 'NY' and keep track of other attributes.\n"
             "- Phrasings like 'trusty city -Albany' or 'trustee city Albany' should set 'trustee_city' to 'Albany'. Do NOT map city names (e.g., 'Albany') to the 'state' field as 'NY' or any other state abbreviation.\n"
