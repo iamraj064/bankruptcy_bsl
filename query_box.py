@@ -982,14 +982,17 @@ def intent_classifier(user_question: str, conversation_memory: dict = None, toke
             "- 'visualization': explicitly requests a chart, plot, pie, bar, graph, or distribution representation (e.g., 'draw a pie chart of chapter distribution', 'plot filings over time').\n"
             "- 'follow_up': references the previous question/results, or uses pronouns/reference words like 'these', 'those', 'that', 'convert to chart' (e.g., 'filter those by active status', 'plot that').\n"
             "- 'unclear': off-topic queries, greetings, or ambiguous text (e.g., 'hello', 'what is bankruptcy').\n\n"
-            "Respond ONLY with a JSON object containing the classified intent, formatted as:\n"
+            "Respond ONLY with a JSON object containing the reasoning, confidence, and intent, formatted as:\n"
             "{\n"
+            '  "reasoning": "<one sentence explaining the user intent classification>",\n'
+            '  "confidence": <confidence score from 0.0 to 1.0>,\n'
             '  "intent": "data_retrieval|aggregation|filter|visualization|follow_up|unclear"\n'
             "}\n"
             "Do not include markdown, code blocks, or explanation text outside the JSON."
         )
         
-        response = call_llm_with_cache(prompt, temperature=0.0)
+        intent_model = os.getenv("INTENT_DETECTION_MODEL_ID") or "anthropic.claude-3-haiku-20240307-v1:0"
+        response = call_llm_with_cache(prompt, model=intent_model, temperature=0.0)
         if token_usage is not None:
             usage = count_token_usage(prompt, response)
             for k, v in usage.items():
@@ -1002,6 +1005,12 @@ def intent_classifier(user_question: str, conversation_memory: dict = None, toke
             cleaned = re.sub(r"\n?```$", "", cleaned)
             
         data = json.loads(cleaned)
+        logger.info(
+            "Intent Classifier | detected=%s | confidence=%s | reasoning=%r",
+            data.get("intent"),
+            data.get("confidence"),
+            data.get("reasoning"),
+        )
         return data.get("intent", "data_retrieval")
     except Exception as e:
         logger.warning("Intent classification failed, falling back to 'data_retrieval': %s", e)
@@ -1726,7 +1735,7 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "9b. When filtering by record_type (e.g. 'new vs closed cases'), add WHERE TRIM(record_type) IN ('New', 'Closed') and GROUP BY record_type. If record_type is a list in EXTRACTED ENTITIES, use IN with all values. If a single string, use = with that value.\n"
             "10. If a specific year (e.g., '2024') or relative timeframe (e.g., 'last 12 months', 'last year') is requested in the user query and present in `date_or_year` in EXTRACTED ENTITIES, you MUST include a WHERE filter for that time. For a specific year, use (e.g., `strftime('%Y', date_filed) = '2024'`). For a relative timeframe like 'last 12 months', use date math: `WHERE date_filed >= DATE((SELECT MAX(date_filed) FROM uploaded_data), '-12 months')`. DO NOT retrieve or aggregate over all dates when a specific time is explicitly requested. If the user asks for a distribution/breakdown within a single year (e.g., '2024 distribution') but does not specify another grouping attribute (like chapter or state), group by month (e.g. `strftime('%m', date_filed) AS month`) to show a meaningful distribution.\n"
             "11. If the user requests sorting or limiting (e.g., 'top 3 risk cases', 'highest score cases', or `limit` and `sort_by_field` are set in EXTRACTED ENTITIES), you MUST construct a SELECT query that retrieves case records (selecting relevant columns like match_score, first_name, last_name, client_name, match_code, status, date_filed, case_number), order by the mapped `sort_by_field` column (e.g. match_score for risk/score) according to the `sort_order` (e.g. `ORDER BY match_score DESC`), and apply the `limit` (e.g. `LIMIT 3`). DO NOT group or count unless specifically asked.\n"
-            "11b. Pay careful attention to singular vs plural requests! If the user asks for singular (e.g. 'Which state has the most...', 'Which attorney has the highest...'), use `LIMIT 1`. If the user asks for plural without a specific number (e.g. 'Which states have the most...', 'Which attorneys have the highest...'), do NOT use any LIMIT, just use `ORDER BY count DESC`. If a general distribution or grouping over all categories is requested (e.g., 'each year', 'filings by state', 'breakdown by chapter', 'each month'), or if the user asks for BOTH extremes/superlatives (e.g. 'highest and lowest', 'most and least'), do NOT apply any simple LIMIT, but rather use UNION ALL for both extremes as specified in Rule 21. If a specific number is requested (e.g. 'top 3 states'), use that exact limit (e.g. `LIMIT 3`). Do NOT use arbitrary limits like `LIMIT 5` unless specifically requested.\n"
+            "11b. Pay careful attention to singular vs plural requests! If the user asks for singular (e.g. 'Which state has the most...', 'Which attorney has the highest...', 'Top client...'), use `LIMIT 1`. If the user asks for plural without a specific number (e.g. 'Which states have the most...', 'Which attorneys have the highest...', 'Top clients...'), do NOT use any LIMIT, just use `ORDER BY count DESC` to show all matching rows. For example, 'Top client filed chapter 7' gets `LIMIT 1` because 'client' is singular, but 'Top clients filed chapter 7' gets NO LIMIT because 'clients' is plural. If a general distribution or grouping over all categories is requested (e.g., 'each year', 'filings by state', 'breakdown by chapter', 'each month'), or if the user asks for BOTH extremes/superlatives (e.g. 'highest and lowest', 'most and least'), do NOT apply any simple LIMIT, but rather use UNION ALL for both extremes as specified in Rule 21. If a specific number is requested (e.g. 'top 3 states'), use that exact limit (e.g. `LIMIT 3`). Do NOT use arbitrary limits like `LIMIT 5` unless specifically requested.\n"
             "12. When consumer_type is specified (e.g. Partnership, Business, Corporate), filter it using `TRIM(consumer_type) = 'value'`.\n"
             "13. When prose_indicator is Y, filter using `TRIM(prose_indicator) = 'Y'`.\n"
             "14. When has_no_attorney is true, filter using: `(TRIM(prose_indicator) = 'Y' OR attorney_first_name IS NULL OR TRIM(attorney_first_name) = '')`.\n"
@@ -1737,7 +1746,15 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "19. If the RECENT CONVERSATION HISTORY is present and the current user question is a follow-up query asking for details, a breakdown, or a group-by on the previous query, you must construct a query against the main database table (uploaded_data) that inherits and applies the EXACT filters from the previous query's SQL (e.g. if the previous query was filtered to WHERE TRIM(match_code) IN ('P3', 'M3'), you must include that exact WHERE clause in your new query).\n"
             "20. When calculating 'increase', 'growth', or 'change' over time (e.g., 'largest increase over the past year'), use conditional aggregation to subtract the previous period's count from the current period's count. For example: `SUM(CASE WHEN date_filed >= DATE((SELECT MAX(date_filed) FROM uploaded_data), '-12 months') THEN 1 ELSE 0 END) - SUM(CASE WHEN date_filed >= DATE((SELECT MAX(date_filed) FROM uploaded_data), '-24 months') AND date_filed < DATE((SELECT MAX(date_filed) FROM uploaded_data), '-12 months') THEN 1 ELSE 0 END) AS increase`. Group by the requested field and sort by `increase DESC`.\n"
             "21. If the user's question asks for BOTH extremes/superlatives (e.g., 'highest and lowest', 'most and least', 'top and bottom', 'maximum and minimum' count/filings), you MUST construct a query combining the top 1 (ordered count DESC LIMIT 1) and the bottom 1 (ordered count ASC LIMIT 1) using UNION ALL. Enclose each subquery fully in parentheses. Example: `SELECT * FROM (SELECT state, COUNT(*) AS count FROM uploaded_data GROUP BY state ORDER BY count DESC LIMIT 1) UNION ALL SELECT * FROM (SELECT state, COUNT(*) AS count FROM uploaded_data GROUP BY state ORDER BY count ASC LIMIT 1)`.\n"
-            "22. If the user asks for a percentage or count of a specific subset in the 'top' item (e.g., 'percentage of Chapter 7 cases in the top state'), do NOT use a GROUP BY on the outer query if it causes NULL rows. Instead, find the top item using a subquery and filter the main query by it, then calculate the single percentage value across that filtered set.\n\n"
+            "22. If the user asks for a percentage or count of a specific subset in the 'top' item (e.g., 'percentage of Chapter 7 cases in the top state'), do NOT use a GROUP BY on the outer query if it causes NULL rows. Instead, find the top item using a subquery and filter the main query by it, then calculate the single percentage value across that filtered set.\n"
+            "23. SQLITE SYNTAX LIMITATIONS — THIS IS SQLITE, NOT MYSQL/POSTGRES:\n"
+            "   - DO NOT USE: DATE_ADD, DATE_SUB, DATEDIFF, NOW(), CURDATE(), YEAR(), MONTH(), DAY(), EXTRACT()\n"
+            "   - USE STRFTIME('%Y', date_column) instead of YEAR(date_column)\n"
+            "   - USE STRFTIME('%m', date_column) instead of MONTH(date_column)\n"
+            "   - USE DATE('now') instead of NOW() or CURDATE()\n"
+            "   - USE DATE(date_column, '+30 days') or DATE(date_column, '-1 month') instead of DATE_ADD/DATE_SUB\n"
+            "   - USE CAST(JULIANDAY(date_a) - JULIANDAY(date_b) AS INTEGER) instead of DATEDIFF(date_a, date_b)\n"
+            "   - DO NOT USE STATISTICAL FUNCTIONS: STDDEV, VARIANCE, CORR, COVAR\n\n"
             "FEW-SHOT EXAMPLES:\n"
             "Please Refer to the below examples for Query Generations:\n\n"
             "Example 1:\n"
@@ -1820,6 +1837,11 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "Entities: {\"chapter\": 7, \"group_by_fields\": [\"client_name\"], \"limit\": 1, \"sort_order\": \"desc\", \"aggregation_type\": \"count\"}\n"
             "Mappings: {\"chapter\": \"chapter\", \"group_by_fields\": [\"client_name\"]}\n"
             "Sample SQL: SELECT client_name, COUNT(*) AS count FROM uploaded_data WHERE chapter = 7 GROUP BY client_name ORDER BY count DESC LIMIT 1\n\n"
+            "Example Top clients filed chapter 7:\n"
+            "Question: \"Top clients filed chapter 7\"\n"
+            "Entities: {\"chapter\": 7, \"group_by_fields\": [\"client_name\"], \"limit\": null, \"sort_order\": \"desc\", \"aggregation_type\": \"count\"}\n"
+            "Mappings: {\"chapter\": \"chapter\", \"group_by_fields\": [\"client_name\"]}\n"
+            "Sample SQL: SELECT client_name, COUNT(*) AS count FROM uploaded_data WHERE chapter = 7 GROUP BY client_name ORDER BY count DESC\n\n"
             "Example show chapter 13 business cases:\n"
             "Question: \"show chapter 13 business cases\"\n"
             "Entities: {\"chapter\": 13, \"consumer_type\": \"Business\"}\n"
