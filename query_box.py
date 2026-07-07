@@ -1735,7 +1735,7 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "9b. When filtering by record_type (e.g. 'new vs closed cases'), add WHERE TRIM(record_type) IN ('New', 'Closed') and GROUP BY record_type. If record_type is a list in EXTRACTED ENTITIES, use IN with all values. If a single string, use = with that value.\n"
             "10. If a specific year (e.g., '2024') or relative timeframe (e.g., 'last 12 months', 'last year') is requested in the user query and present in `date_or_year` in EXTRACTED ENTITIES, you MUST include a WHERE filter for that time. For a specific year, use (e.g., `strftime('%Y', date_filed) = '2024'`). For a relative timeframe like 'last 12 months', use date math: `WHERE date_filed >= DATE((SELECT MAX(date_filed) FROM uploaded_data), '-12 months')`. DO NOT retrieve or aggregate over all dates when a specific time is explicitly requested. If the user asks for a distribution/breakdown within a single year (e.g., '2024 distribution') but does not specify another grouping attribute (like chapter or state), group by month (e.g. `strftime('%m', date_filed) AS month`) to show a meaningful distribution.\n"
             "11. If the user requests sorting or limiting (e.g., 'top 3 risk cases', 'highest score cases', or `limit` and `sort_by_field` are set in EXTRACTED ENTITIES), you MUST construct a SELECT query that retrieves case records (selecting relevant columns like match_score, first_name, last_name, client_name, match_code, status, date_filed, case_number), order by the mapped `sort_by_field` column (e.g. match_score for risk/score) according to the `sort_order` (e.g. `ORDER BY match_score DESC`), and apply the `limit` (e.g. `LIMIT 3`). DO NOT group or count unless specifically asked.\n"
-            "11b. Pay careful attention to singular vs plural requests! If the user asks for singular (e.g. 'Which state has the most...', 'Which attorney has the highest...', 'Top client...'), use `LIMIT 1`. If the user asks for plural without a specific number (e.g. 'Which states have the most...', 'Which attorneys have the highest...', 'Top clients...'), do NOT use any LIMIT, just use `ORDER BY count DESC` to show all matching rows. For example, 'Top client filed chapter 7' gets `LIMIT 1` because 'client' is singular, but 'Top clients filed chapter 7' gets NO LIMIT because 'clients' is plural. If a general distribution or grouping over all categories is requested (e.g., 'each year', 'filings by state', 'breakdown by chapter', 'each month'), or if the user asks for BOTH extremes/superlatives (e.g. 'highest and lowest', 'most and least'), do NOT apply any simple LIMIT, but rather use UNION ALL for both extremes as specified in Rule 21. If a specific number is requested (e.g. 'top 3 states'), use that exact limit (e.g. `LIMIT 3`). Do NOT use arbitrary limits like `LIMIT 5` unless specifically requested.\n"
+            "11b. Pay careful attention to singular vs plural requests! If the user asks for singular (e.g. 'Which state has the most...', 'Which attorney has the highest...'), use `LIMIT 1`. If the user asks for plural without a specific number (e.g. 'Which states have the most...', 'Which attorneys have the highest...'), do NOT use any LIMIT, just use `ORDER BY count DESC`. If a general distribution or grouping over all categories is requested (e.g., 'each year', 'filings by state', 'breakdown by chapter', 'each month'), or if the user asks for BOTH extremes/superlatives (e.g. 'highest and lowest', 'most and least'), do NOT apply any simple LIMIT, but rather use UNION ALL for both extremes as specified in Rule 21. If a specific number is requested (e.g. 'top 3 states'), use that exact limit (e.g. `LIMIT 3`). Do NOT use arbitrary limits like `LIMIT 5` unless specifically requested.\n"
             "12. When consumer_type is specified (e.g. Partnership, Business, Corporate), filter it using `TRIM(consumer_type) = 'value'`.\n"
             "13. When prose_indicator is Y, filter using `TRIM(prose_indicator) = 'Y'`.\n"
             "14. When has_no_attorney is true, filter using: `(TRIM(prose_indicator) = 'Y' OR attorney_first_name IS NULL OR TRIM(attorney_first_name) = '')`.\n"
@@ -1837,11 +1837,6 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "Entities: {\"chapter\": 7, \"group_by_fields\": [\"client_name\"], \"limit\": 1, \"sort_order\": \"desc\", \"aggregation_type\": \"count\"}\n"
             "Mappings: {\"chapter\": \"chapter\", \"group_by_fields\": [\"client_name\"]}\n"
             "Sample SQL: SELECT client_name, COUNT(*) AS count FROM uploaded_data WHERE chapter = 7 GROUP BY client_name ORDER BY count DESC LIMIT 1\n\n"
-            "Example Top clients filed chapter 7:\n"
-            "Question: \"Top clients filed chapter 7\"\n"
-            "Entities: {\"chapter\": 7, \"group_by_fields\": [\"client_name\"], \"limit\": null, \"sort_order\": \"desc\", \"aggregation_type\": \"count\"}\n"
-            "Mappings: {\"chapter\": \"chapter\", \"group_by_fields\": [\"client_name\"]}\n"
-            "Sample SQL: SELECT client_name, COUNT(*) AS count FROM uploaded_data WHERE chapter = 7 GROUP BY client_name ORDER BY count DESC\n\n"
             "Example show chapter 13 business cases:\n"
             "Question: \"show chapter 13 business cases\"\n"
             "Entities: {\"chapter\": 13, \"consumer_type\": \"Business\"}\n"
@@ -1891,6 +1886,9 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
                 token_usage[k] = token_usage.get(k, 0) + v
 
         sql_query = extract_sql_from_response(response)
+        # Programmatic guard: If limit was not extracted, strip any hallucinated LIMIT clause from the end
+        if extracted_entities.get("limit") is None:
+            sql_query = re.sub(r"\bLIMIT\s+\d+\b\s*$", "", sql_query, flags=re.IGNORECASE).strip()
         return sql_query
     except Exception as e:
         logger.exception("SQL building failed: %s", e)
