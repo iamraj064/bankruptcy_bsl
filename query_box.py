@@ -821,6 +821,7 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
             "   - Example: 'P3 and M3 total volume' → 'Show the total count of records where match_code is P3 or M3'\n"
             "   - Example: 'Corporate transfers in NY' → 'Retrieve records where consumer_type is Corporate and state is NY and status is Converted or conversion_date is not null'\n"
             "   - Example: 'show high risk cases' → 'Retrieve records where match_score is greater than or equal to 98 ordered by match_score descending'\n"
+            "   - Example: 'show top 10 high risk cases' → 'Retrieve records where match_score is greater than or equal to 98 ordered by match_score descending showing only the top 10'\n"
             "   - Example: 'High risk cases yearwise' → 'Show count of cases grouped by year (extracted from date_filed) where match_score is greater than or equal to 98'\n"
             "   - Example: 'Top client filed chapter 7' → 'Retrieve the client_name that has the highest count of records where chapter is 7'\n"
             "   - Example: 'show chapter 13 business cases' → 'Retrieve records where chapter is 13 and consumer_type is Business'\n"
@@ -1369,6 +1370,31 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             '  "group_by_fields": [],\n'
             '  "limit": null,\n'
             '  "sort_order": null,\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example show top 10 high risk cases:\n"
+            "Question: \"show top 10 high risk cases\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": null,\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "risk",\n'
+            '  "aggregation_type": null,\n'
+            '  "group_by_fields": [],\n'
+            '  "limit": 10,\n'
+            '  "sort_order": "desc",\n'
             '  "record_type": null,\n'
             '  "consumer_type": null,\n'
             '  "prose_indicator": null,\n'
