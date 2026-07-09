@@ -266,6 +266,7 @@ class InsightVisualizer:
         stats: Dict,
         numeric_insights: Dict,
         categorical_insights: Dict,
+        user_query: str = None,
     ) -> str:
         """Build a prompt for the LLM summarizing dataset trends and drivers."""
         prompt_lines = [
@@ -299,6 +300,25 @@ class InsightVisualizer:
             "Dataset Metadata & Aggregated Statistics:",
         ]
 
+        if user_query:
+            prompt_lines.insert(2, f"ORIGINAL USER QUESTION/QUERY: \"{user_query}\"")
+            prompt_lines.insert(3, "INSTRUCTIONS FOR THIS QUERY:")
+            prompt_lines.insert(4, "1. Answer the user question directly and accurately using the numbers in the dataset.")
+            prompt_lines.insert(5, "2. If the user's question involves a comparison (e.g. 'compare', 'vs', 'difference', 'increase/decrease', or comparing chapters/states/times):")
+            prompt_lines.insert(6, "   - You MUST perform a comparison: calculate the absolute and/or percentage change/difference between the key categories/KPIs.")
+            prompt_lines.insert(7, "   - Identify and list the main driving factors behind these differences or trends.")
+            prompt_lines.insert(8, "3. Ensure all three sections are highly accurate, sharp, specific, and directly informed by the actual data rows provided below. Avoid generic boilerplate phrasing.")
+            prompt_lines.insert(9, "")
+
+        # Format up to 50 rows of data as CSV for precise LLM grounding
+        df_sample = self.df.head(50).to_csv(index=False)
+        prompt_lines.append("")
+        prompt_lines.append("ACTUAL DATASET SAMPLE (Extract exact values and compare these directly):")
+        prompt_lines.append("```csv")
+        prompt_lines.append(df_sample)
+        prompt_lines.append("```")
+        prompt_lines.append("")
+
         if self.insights.date_cols:
             prompt_lines.append(f"- Temporal/Date Columns detected: {', '.join(self.insights.date_cols)}")
 
@@ -328,19 +348,21 @@ class InsightVisualizer:
 
         return "\n".join(prompt_lines)
 
-    def _refine_summary_for_enduser(self, raw_summary: str) -> str:
+    def _refine_summary_for_enduser(self, raw_summary: str, user_query: str = None) -> str:
         """Post-process/refine the raw summary text to ensure premium, end-user focused sentence structure."""
+        user_query_info = f"USER QUERY: \"{user_query}\"\n\n" if user_query else ""
         prompt = (
             "You are a Senior Executive Editor specializing in corporate reports and business intelligence.\n"
             "Your task is to take the draft analysis below and rewrite/polish it to make it sound highly professional, "
             "compelling, and polished for executive end-users. \n\n"
+            f"{user_query_info}"
             "DRAFT ANALYSIS:\n"
             f"{raw_summary}\n\n"
             "REWRITING & POLISHING RULES:\n"
             "1. Strictly maintain the exact markdown headers (e.g. '## Executive Trend Overview', '## Key Drivers & Concentrations', '## Strategic Client Implications') and bullet point list structure.\n"
             "2. Improve sentence formation: make sentences flow naturally, sound elegant, premium, and authoritative. Avoid clunky, repetitive, or robotic sentence structures.\n"
             "3. Ensure the tone is highly tailored for business leaders, decision-makers, and clients. Use executive-level vocabulary (e.g. concentration risk, portfolio optimization, credit risk exposure) instead of generic phrases.\n"
-            "4. Retain all key statistics, numbers, percentages, and names from the draft. Do not invent or change any figures.\n"
+            "4. Retain all key statistics, numbers, percentages, and names from the draft. Do not invent or change any figures. Ensure comparative metrics like percentage differences are preserved.\n"
             "5. Keep the total length concise, executive-focused, and under 160 words.\n"
             "6. Output ONLY the polished markdown. Do not include any intro, outro, meta-commentary, or surrounding markdown code blocks (e.g. do not wrap in ```markdown or ```)."
         )
@@ -351,21 +373,21 @@ class InsightVisualizer:
             logger.warning("Refining summary for end-user failed: %s", e)
             return raw_summary
 
-    def _generate_llm_summary(self, stats: Dict) -> Optional[str]:
+    def _generate_llm_summary(self, stats: Dict, user_query: str = None) -> Optional[str]:
         """Generate an LLM-based executive summary of dataset insights."""
         try:
             numeric_insights = self.insights.get_numeric_insights()
             categorical_insights = self.insights.get_categorical_insights()
-            prompt = self._build_llm_summary_prompt(stats, numeric_insights, categorical_insights)
+            prompt = self._build_llm_summary_prompt(stats, numeric_insights, categorical_insights, user_query=user_query)
             llm_response = call_llm_with_cache(prompt, temperature=0.1)
             if llm_response:
-                return self._refine_summary_for_enduser(llm_response.strip())
+                return self._refine_summary_for_enduser(llm_response.strip(), user_query=user_query)
             return None
         except Exception as e:
             logger.warning("LLM summary generation failed: %s", e)
             return None
 
-    def render_executive_summary(self):
+    def render_executive_summary(self, user_query: str = None):
         """Render executive summary with key metrics"""
         stats = self.insights.generate_summary_statistics()
 
@@ -381,7 +403,7 @@ class InsightVisualizer:
         # with col4:
         #     st.metric("Memory (MB)", stats["memory_usage_mb"])
 
-        llm_summary = self._generate_llm_summary(stats)
+        llm_summary = self._generate_llm_summary(stats, user_query=user_query)
         if llm_summary:
             import re
             # Scale heading font sizes to 60% of Streamlit defaults:
@@ -456,7 +478,7 @@ class InsightVisualizer:
                         yaxis_title=y_label,
                     )
                 )
-                fig.update_xaxes(tickangle=-35 if bar_data[cat_col].nunique() > 6 else 0)
+                fig.update_xaxes(type='category', tickangle=-35 if bar_data[cat_col].nunique() > 6 else 0)
                 st.plotly_chart(fig, use_container_width=True, key=f"plotly_{self.viz_id}_{self._chart_idx()}")
             else:
                 # Histogram
@@ -684,6 +706,7 @@ class InsightVisualizer:
                     yaxis_title=y_label,
                 )
             )
+            fig.update_xaxes(type='category')
             st.plotly_chart(fig, use_container_width=True, key=f"plotly_{self.viz_id}_{self._chart_idx()}")
             return
 
@@ -751,7 +774,7 @@ class InsightVisualizer:
                 yaxis_title=y_label,
             )
         )
-        fig.update_xaxes(tickangle=-35 if plot_df[c1].nunique() > 6 else 0)
+        fig.update_xaxes(type='category', tickangle=-35 if plot_df[c1].nunique() > 6 else 0)
         st.plotly_chart(fig, use_container_width=True, key=f"plotly_{self.viz_id}_{self._chart_idx()}")
 
     def render_horizontal_bar(self):
