@@ -822,6 +822,7 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
             "   - Example: 'Corporate transfers in NY' → 'Retrieve records where consumer_type is Corporate and state is NY and status is Converted or conversion_date is not null'\n"
             "   - Example: 'show high risk cases' → 'Retrieve records where match_score is greater than or equal to 98 ordered by match_score descending'\n"
             "   - Example: 'show top 10 high risk cases' → 'Retrieve records where match_score is greater than or equal to 98 ordered by match_score descending showing only the top 10'\n"
+            "   - Example: 'show all chapters filing counts' → 'Show count of cases grouped by chapter column ordered by count descending'\n"
             "   - Example: 'High risk cases yearwise' → 'Show count of cases grouped by year (extracted from date_filed) where match_score is greater than or equal to 98'\n"
             "   - Example: 'Top client filed chapter 7' → 'Retrieve the client_name that has the highest count of records where chapter is 7'\n"
             "   - Example: 'show chapter 13 business cases' → 'Retrieve records where chapter is 13 and consumer_type is Business'\n"
@@ -1082,7 +1083,7 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             "    - If the target noun is singular, set 'limit' to 1 (or the number specified).\n"
             "    - If the target noun is plural, do NOT set 'limit' unless a specific number is requested.\n"
             "    - Set 'sort_order' to 'asc' and 'sort_by_field' to 'count'.\n"
-            "  * For standard grouping/distribution queries without a superlative (e.g. 'each year', 'yearly', 'by state', 'by chapter', 'each month', 'each state'), do NOT set 'limit' (set limit to null) and set 'sort_order' to null.\n"
+            "  * For standard grouping/distribution queries without a superlative (e.g. 'each year', 'yearly', 'by state', 'by chapter', 'each month', 'each state', 'all chapters', 'all states', 'all status counts'), do NOT set 'limit' (set limit to null) and set 'sort_order' to null.\n"
             "  * If the question asks for BOTH extremes/superlatives (e.g., 'highest and lowest', 'most and least', 'top and bottom', 'maximum and minimum' count/filings), do NOT set 'limit' (set limit to null) and set 'sort_order' to 'desc' and 'sort_by_field' to 'count'. This allows the full sorted list to be returned so the user sees both ends of the spectrum.\n"
             "  * CRITICAL: Do NOT hallucinate or set a default value for 'state', 'chapter', 'date_or_year' (like defaulting to '2024' or current year), or other columns unless that specific filter value is explicitly stated in the user's question. For example, if the question is 'Which state has the most bankruptcy filings?', 'state' must be null, 'group_by_fields' must contain ['state'], 'limit' must be 1, and 'sort_order' must be 'desc'. If the question is 'Which states have the most filings?', 'state' must be null, 'group_by_fields' must contain ['state'], 'limit' must be null, and 'sort_order' must be 'desc'. If the user asks about 'Which year' or 'by year' without a specific year, 'date_or_year' must be null, 'group_by_fields' must contain ['year'], 'limit' must be 1 ONLY if it is a singular superlative (like 'which year has the highest filings'), and 'sort_order' must be 'desc' if superlative. If the user asks for general distribution (e.g., 'each year', 'by year', 'yearly breakdown') or both extremes (e.g. 'highest and lowest', 'most and least'), 'limit' must be null. If the user asks 'Which attorneys have...', 'limit' must be null, not 1 or 5.\n"
             "- CRITICAL DISAMBIGUATION between 'record_type' and 'status':\n"
@@ -2630,8 +2631,20 @@ def is_followup_question(user_query: str, conversation_history: dict) -> bool:
 
     # ─────────────────────────────────────────────────────────────────────────
     # FALSE-POSITIVE GUARD – penalise if a wholly new entity is introduced
-    # that was not in the previous query at all
+    # or if the query is a request for a fresh complete distribution ("all", "each", "every")
     # ─────────────────────────────────────────────────────────────────────────
+    # Fresh distribution request guard
+    FRESH_DISTRIBUTION_PATTERNS = [
+        r'\ball\s+chapters\b', r'\ball\s+states\b', r'\ball\s+status\b', r'\ball\s+match\b', r'\ball\s+client\b', r'\ball\s+attorney\b',
+        r'\beach\s+chapter\b', r'\beach\s+state\b', r'\beach\s+status\b', r'\beach\s+match\b', r'\beach\s+client\b', r'\beach\s+attorney\b',
+        r'\bevery\s+chapter\b', r'\bevery\s+state\b', r'\bevery\s+status\b', r'\bevery\s+match\b', r'\bevery\s+client\b', r'\bevery\s+attorney\b',
+        r'\bshow\s+all\b', r'\blist\s+all\b', r'\bcount\s+all\b',
+    ]
+    for pattern in FRESH_DISTRIBUTION_PATTERNS:
+        if re.search(pattern, query_lower):
+            penalty += 0.8
+            signals_fired.append("G:fresh-distribution-request")
+            break
     US_STATES = {
         'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado',
         'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho',
@@ -2831,7 +2844,16 @@ def _handle_user_query(user_query, schema, active_schema):
         
         # Determine if we should query the temporary table or fallback to the main database
         use_temp_table = False
-        if is_followup and st.session_state.temp_table_schema:
+        
+        # Check if user question explicitly asks for a fresh complete distribution ("all", "each", "every")
+        # in which case we should bypass the temporary table and query the main database
+        is_fresh_distribution_request = False
+        query_lower = user_query.lower().strip()
+        FRESH_DISTRIBUTION_WORDS = ['all', 'each', 'every', 'entire', 'whole', 'fresh', 'reset']
+        if any(w in query_lower for w in FRESH_DISTRIBUTION_WORDS):
+            is_fresh_distribution_request = True
+            
+        if is_followup and st.session_state.temp_table_schema and not is_fresh_distribution_request:
             temp_cols = {col['name'].lower() for col in st.session_state.temp_table_schema.get("columns", [])}
             needed_cols = {col.lower() for col in understanding.get("relevant_columns", [])}
             
