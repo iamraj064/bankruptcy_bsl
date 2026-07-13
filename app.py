@@ -10,6 +10,12 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 from config import call_llm, call_llm_haiku, call_llm_with_cache, count_token_usage
+import importlib
+import query_box
+import insights_generator
+importlib.reload(query_box)
+importlib.reload(insights_generator)
+
 from dotenv import load_dotenv
 from insights_generator import generate_insights
 from forecasting_engine import (
@@ -1667,6 +1673,9 @@ def main():
     if "temp_table_dataframe" not in st.session_state:
         st.session_state.temp_table_dataframe = None
 
+    if "followup_level" not in st.session_state:
+        st.session_state.followup_level = 0
+
     # Load default schema
     schema = load_schema()
     if not schema:
@@ -1720,10 +1729,10 @@ def main():
             _conn = sqlite3.connect("data.db")
             try:
                 _states_df = pd.read_sql_query(
-                    f"SELECT DISTINCT State FROM {_tname} WHERE State IS NOT NULL AND State != '' ORDER BY State",
+                    f"SELECT DISTINCT state FROM {_tname} WHERE state IS NOT NULL AND state != '' ORDER BY state",
                     _conn
                 )
-                _state_list = sorted(_states_df["State"].tolist())
+                _state_list = sorted(_states_df["state"].tolist())
             except:
                 _state_list = []
             try:
@@ -1744,10 +1753,10 @@ def main():
                 _status_list = ["Active", "Closed", "Pending", "Converted", "Dismissed"]
             try:
                 _client_df = pd.read_sql_query(
-                    f"SELECT DISTINCT client FROM {_tname} WHERE client IS NOT NULL AND client != '' ORDER BY client",
+                    f"SELECT DISTINCT client_name FROM {_tname} WHERE client_name IS NOT NULL AND client_name != '' ORDER BY client_name",
                     _conn
                 )
-                _client_list = sorted(_client_df["client"].tolist())
+                _client_list = sorted(_client_df["client_name"].tolist())
             except:
                 _client_list = []
             _conn.close()
@@ -1793,10 +1802,10 @@ def main():
                 _fc_chapter_list = [7, 11, 13]
             try:
                 _fstates_df = pd.read_sql_query(
-                    f"SELECT DISTINCT State FROM {_ftname} WHERE State IS NOT NULL AND State != '' ORDER BY State",
+                    f"SELECT DISTINCT state FROM {_ftname} WHERE state IS NOT NULL AND state != '' ORDER BY state",
                     _fconn
                 )
-                _fc_state_list = sorted(_fstates_df["State"].tolist())
+                _fc_state_list = sorted(_fstates_df["state"].tolist())
             except:
                 _fc_state_list = []
             try:
@@ -1807,6 +1816,14 @@ def main():
                 _fc_status_list = sorted(_fstatus_df["status"].tolist())
             except:
                 _fc_status_list = ["Active", "Closed", "Pending", "Converted", "Dismissed"]
+            try:
+                _fclient_df = pd.read_sql_query(
+                    f"SELECT DISTINCT client_name FROM {_ftname} WHERE client_name IS NOT NULL AND client_name != '' ORDER BY client_name",
+                    _fconn
+                )
+                _fc_client_list = sorted(_fclient_df["client_name"].tolist())
+            except:
+                _fc_client_list = []
 
             # Query for date bounds
             _min_date_val = datetime.date(2020, 1, 1)
@@ -1838,6 +1855,9 @@ def main():
 
             _fc_state_sel = st.selectbox("State / Territory", ["All"] + _fc_state_list, key="fc_state")
             _fc_state_val = None if _fc_state_sel == "All" else _fc_state_sel
+
+            _fc_client_sel = st.selectbox("Client", ["All"] + _fc_client_list, key="fc_client")
+            _fc_client_val = None if _fc_client_sel == "All" else _fc_client_sel
 
             _fc_status_sel = st.selectbox("Case Status", ["All"] + _fc_status_list, key="fc_status")
             _fc_status_val = None if _fc_status_sel == "All" else _fc_status_sel
@@ -1876,6 +1896,7 @@ def main():
                 "chapter_val": _fc_chapter_val,
                 "state_val": _fc_state_val,
                 "status_val": _fc_status_val,
+                "client_val": _fc_client_val,
                 "prose_val": _fc_prose_val,
                 "horizon": _fc_horizon_val,
                 "start_date": _fc_start_date,
@@ -1908,6 +1929,8 @@ def main():
                         st.session_state.last_uploaded_file_name = uploaded_file.name
                         st.session_state.data_in_db = True
                         st.session_state.actual_schema = get_actual_database_schema()
+                        st.session_state.conversation_memory = _initialize_conversation_memory()
+                        st.session_state.followup_level = 0
                         st.session_state.nav_redirect = "Analytics"
 
                         st.success(f"Loaded: {uploaded_file.name}")
@@ -2560,6 +2583,7 @@ def main():
             fc_chapter_val = _ff.get("chapter_val")
             fc_state_val   = _ff.get("state_val")
             fc_status_val  = _ff.get("status_val")
+            fc_client_val  = _ff.get("client_val")
             fc_prose_val   = _ff.get("prose_val")
             fc_horizon     = _ff.get("horizon", 12)
             fc_start_date  = _ff.get("start_date")
@@ -2567,13 +2591,13 @@ def main():
 
             #  Run models 
             @st.cache_data(ttl=120, show_spinner=False)
-            def _fc(ch, st_val, stat_val, pr_val, h, start_d, end_d):
+            def _fc(ch, st_val, stat_val, pr_val, cl_val, h, start_d, end_d):
                 df_s = load_monthly_series(
                     chapter_filter=ch,
                     state_filter=st_val,
                     status_filter=stat_val,
                     prose_filter=pr_val,
-                    client_filter=None,
+                    client_filter=cl_val,
                     start_date=start_d,
                     end_date=end_d,
                 )
@@ -2585,6 +2609,7 @@ def main():
                     fc_state_val,
                     fc_status_val,
                     fc_prose_val,
+                    fc_client_val,
                     fc_horizon,
                     fc_start_date,
                     fc_end_date,
@@ -2625,15 +2650,15 @@ def main():
                 # ── Load the FULL available series (no date filter) so we can overlay
                 #    real observed values on the forecast period for backtesting. ──────
                 @st.cache_data(ttl=120, show_spinner=False)
-                def _load_full_series(ch, st_val, stat_val, pr_val):
+                def _load_full_series(ch, st_val, stat_val, pr_val, cl_val):
                     return load_monthly_series(
                         chapter_filter=ch, state_filter=st_val,
                         status_filter=stat_val, prose_filter=pr_val,
-                        client_filter=None, start_date=None, end_date=None,
+                        client_filter=cl_val, start_date=None, end_date=None,
                     )
 
                 df_full = _load_full_series(
-                    fc_chapter_val, fc_state_val, fc_status_val, fc_prose_val
+                    fc_chapter_val, fc_state_val, fc_status_val, fc_prose_val, fc_client_val
                 )
 
                 # Find actual data that falls inside the forecast window

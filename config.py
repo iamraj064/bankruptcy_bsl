@@ -68,7 +68,9 @@ def call_llm(
       2. Fallback to AWS Bedrock with 'meta.llama3-8b-instruct-v1:0'
     """
     # Use Bedrock
-    bedrock_model = os.getenv('BEDROCK_MODEL_ID') or "anthropic.claude-3-haiku-20240307-v1:0"
+    bedrock_model = model
+    if not bedrock_model or bedrock_model == 'meta.llama3-8b-instruct-v1:0':
+        bedrock_model = os.getenv('BEDROCK_MODEL_ID') or "anthropic.claude-3-haiku-20240307-v1:0"
     if bedrock_model in ['meta.llama3-8b-instruct-v1:0', 'anthropic.claude-opus-4-8']:
         bedrock_model = 'anthropic.claude-3-haiku-20240307-v1:0'
 
@@ -117,7 +119,36 @@ def call_llm(
         return (output_text or "").strip()
 
     except Exception as e:
-        logger.warning("Bedrock call with %s failed: %s. Trying fallback model meta.llama3-8b-instruct-v1:0", bedrock_model, e)
+        logger.warning("Bedrock call with %s failed: %s.", bedrock_model, e)
+        if bedrock_model != "anthropic.claude-3-haiku-20240307-v1:0":
+            try:
+                logger.info("Trying fallback model anthropic.claude-3-haiku-20240307-v1:0")
+                start = time.perf_counter()
+                response = bedrock_client.converse(
+                    modelId="anthropic.claude-3-haiku-20240307-v1:0",
+                    messages=messages,
+                    inferenceConfig={
+                        'temperature': temperature,
+                    },
+                )
+                output_text = ""
+                out = response.get('output') or {}
+                msg = out.get('message') or {}
+                content = msg.get('content') or []
+                if content and isinstance(content, list):
+                    first = content[0]
+                    if isinstance(first, dict):
+                        output_text = first.get('text') or first.get('body') or ""
+
+                logger.info(
+                    "Fallback Bedrock (Haiku) response received | elapsed_ms=%.2f response_chars=%s",
+                    (time.perf_counter() - start) * 1000,
+                    len(output_text or ""),
+                )
+                return (output_text or "").strip()
+            except Exception as haiku_err:
+                logger.warning("Haiku fallback also failed: %s. Trying llama fallback.", haiku_err)
+
         try:
             start = time.perf_counter()
             response = bedrock_client.converse(

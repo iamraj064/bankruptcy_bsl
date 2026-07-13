@@ -269,30 +269,69 @@ class InsightVisualizer:
         user_query: str = None,
     ) -> str:
         """Build a prompt for the LLM summarizing dataset trends and drivers."""
+        # Calculate Percentage Change column if it is a comparison query and not already present
+        if user_query:
+            q_lower = user_query.lower()
+            is_comparison = any(kw in q_lower for kw in ["compare", "vs", "versus", "difference"])
+            if is_comparison and "Percentage Change" not in self.df.columns:
+                numeric_cols = self.df.select_dtypes(include="number").columns.tolist()
+                if len(self.df) >= 2 and numeric_cols:
+                    val_col = None
+                    value_keywords = ['count', 'total', 'frequency', 'value', 'sum', 'amount', 'pct', 'ratio', 'percentage']
+                    for col in numeric_cols:
+                        if any(kw in str(col).lower() for kw in value_keywords):
+                            val_col = col
+                            break
+                    if not val_col:
+                        val_col = numeric_cols[-1]
+                    
+                    baseline = float(self.df.iloc[0][val_col])
+                    if baseline != 0:
+                        self.df = self.df.copy()
+                        pct_changes = []
+                        for idx, row in self.df.iterrows():
+                            if idx == 0:
+                                pct_changes.append("Baseline")
+                            else:
+                                val = float(row[val_col])
+                                pct = ((val - baseline) / baseline) * 100
+                                if pct > 0:
+                                    pct_changes.append(f"+{pct:.1f}% ▲")
+                                elif pct < 0:
+                                    pct_changes.append(f"{pct:.1f}% ▼")
+                                else:
+                                    pct_changes.append("0.0%")
+                        self.df["Percentage Change"] = pct_changes
+
         prompt_lines = [
             "Role: You are an elite strategic credit risk advisor and business intelligence analyst.",
             "Task: Generate a highly polished, client-focused 'Trend Summary Analysis' based on the dataset characteristics provided below.",
             "",
             "CRITICAL FORMATTING RULES (follow exactly):",
             "1. Tone: Professional, executive-level, clear, and highly authoritative. Speak directly to business leaders/clients.",
-            "2. Use the exact markdown structure shown below Ã¢â‚¬â€ do NOT merge sections into a single paragraph.",
+            "2. Use the exact markdown structure shown below — do NOT merge sections into a single paragraph.",
             "3. Each section MUST start on its own new line with a markdown header (## or ###).",
-            "4. The 'Key Drivers & Concentrations' section MUST be a bullet list using '- ' prefix for each item.",
+            "4. The 'Key Drivers & Concentrations' section MUST be a bullet list using '- ' prefix for each item. Do not include bullet points for categories, columns, or metrics that are absent from the dataset.",
             "5. Use **bold** to emphasize key numbers, percentages, and names.",
             "6. Do NOT write prose paragraphs where bullet lists are required.",
-            "7. Keep total output under 160 words. No introductory or concluding meta-text.",
+            "7. Keep total output under 150 words. No introductory or concluding meta-text.",
+            "8. Write with high density: make the output short, sharp, and directly informative.",
+            "9. CRITICAL STYLE FILTER: NEVER use filler phrases like 'The data shows', 'The records contain', 'The dataset indicates', 'Based on the provided data', 'Our analysis reveals', 'The table shows', or similar fluff. State the findings directly and assertively as facts (e.g. write 'DM holds a slightly higher count of 2,545 compared to VP's 2,455...' instead of 'The data shows that DM has...').",
             "",
-            "REQUIRED OUTPUT STRUCTURE (use this exact format):",
+            "REQUIRED OUTPUT STRUCTURE AND STYLE GUIDE:",
             "## Executive Trend Overview",
-            "<1-2 sentence summary of overall volume and distribution trajectory>",
+            "Provide a concise, high-level summary (1-2 sentences) of the overall volume, distribution, and general trajectory. "
+            "Highlight the most prominent finding (e.g. state concentration or chapter dominance) using professional banking terminology.",
             "",
             "## Key Drivers & Concentrations",
-            "- <Driver 1: e.g., top states/territories with % share>",
-            "- <Driver 2: e.g., dominant bankruptcy chapter with % share>",
-            "- <Driver 3: e.g., primary risk profile or debtor type>",
+            "Provide a bulleted list of 1 to 3 key drivers and concentration details. "
+            "Each bullet point should focus on a specific, mathematically correct data driver (e.g. top state, dominant chapter, or high-risk segment). "
+            "Format values as raw counts (e.g., '184 out of 361 cases') and always keep delta arrows (e.g. '+21.7% ▲', '-1.7% ▼') if present in the data. "
+            "Do NOT include a bullet point for categories or fields not present in the dataset.",
             "",
             "## Strategic Client Implications",
-            "<1-2 sentences on portfolio management, resource allocation, or operational risk>",
+            "Provide 1-2 sentences of forward-looking, actionable business advice based directly on the findings. "
+            "Use terms related to portfolio management, operational risk, resource allocation, or credit exposure to guide the client on what these trends mean for their operations.",
             "",
             "Tone: Professional, executive-level, authoritative. Speak directly to business leaders.",
             "Focus: Translate statistics into strategic business insights. Avoid column names, SQL, or data-quality language.",
@@ -305,10 +344,13 @@ class InsightVisualizer:
             prompt_lines.insert(3, "INSTRUCTIONS FOR THIS QUERY:")
             prompt_lines.insert(4, "1. Answer the user question directly and accurately using the numbers in the dataset.")
             prompt_lines.insert(5, "2. If the user's question involves a comparison (e.g. 'compare', 'vs', 'difference', 'increase/decrease', or comparing chapters/states/times):")
-            prompt_lines.insert(6, "   - You MUST perform a comparison: calculate the absolute and/or percentage change/difference between the key categories/KPIs.")
+            prompt_lines.insert(6, "   - You MUST perform a comparison: calculate the absolute change/difference between the key categories/KPIs.")
             prompt_lines.insert(7, "   - Identify and list the main driving factors behind these differences or trends.")
             prompt_lines.insert(8, "3. Ensure all three sections are highly accurate, sharp, specific, and directly informed by the actual data rows provided below. Avoid generic boilerplate phrasing.")
-            prompt_lines.insert(9, "")
+            prompt_lines.insert(9, "4. IMPORTANT: You MUST strictly use the pre-calculated raw counts/values listed in the 'Top distributions' below. Quote the raw values (e.g., 184 cases out of 361 total). Do NOT perform any arithmetic calculations or rounding yourself as it may be inaccurate. Quote these exact figures in your output.")
+            prompt_lines.insert(10, "5. Do NOT include any standard percentage share or distribution values (like '51.4%' or '100.0%') in your summary; present those using raw counts (e.g., '57 out of 111 cases'). However, if a 'Percentage Change' column is present in the dataset sample below, you MUST include and quote these exact pre-calculated percentage change values (e.g. '+21.7% ▲', '-1.7% ▼') in both 'Executive Trend Overview' and 'Key Drivers & Concentrations' to compare comparison deltas.")
+            prompt_lines.insert(11, "6. CRITICAL STYLE FILTER: Strictly avoid introductory phrases such as 'The data shows', 'The records contain', 'The dataset indicates', or 'According to the data'. Speak directly and present the findings as immediate facts.")
+            prompt_lines.insert(12, "")
 
         # Format up to 50 rows of data as CSV for precise LLM grounding
         df_sample = self.df.head(50).to_csv(index=False)
@@ -318,6 +360,30 @@ class InsightVisualizer:
         prompt_lines.append(df_sample)
         prompt_lines.append("```")
         prompt_lines.append("")
+
+        # Inject conversation history context if available in st.session_state
+        if "conversation_memory" in st.session_state:
+            memory = st.session_state.conversation_memory
+            if memory and memory.get("history"):
+                history_lines = []
+                for idx, entry in enumerate(memory["history"][-3:]):
+                    q = entry.get('user_question', '')
+                    ans = entry.get('assistant_answer', '')
+                    sql = entry.get('sql_query', '')
+                    cnt = entry.get('record_count', 0)
+                    history_lines.append(f"Turn {idx+1}:")
+                    history_lines.append(f"  User Question: {q}")
+                    if sql:
+                        history_lines.append(f"  SQL Query: {sql}")
+                    if cnt:
+                        history_lines.append(f"  Record Count: {cnt}")
+                    if ans:
+                        short_ans = ans if len(ans) <= 150 else ans[:150] + "..."
+                        history_lines.append(f"  Assistant Answer: {short_ans}")
+                
+                prompt_lines.append("RECENT CONVERSATION HISTORY (Use this for follow-up context and maintaining continuity):")
+                prompt_lines.append("\n".join(history_lines))
+                prompt_lines.append("")
 
         if self.insights.date_cols:
             prompt_lines.append(f"- Temporal/Date Columns detected: {', '.join(self.insights.date_cols)}")
@@ -334,11 +400,97 @@ class InsightVisualizer:
         if self.insights.categorical_cols:
             prompt_lines.append(f"- Categorical Columns detected: {', '.join(self.insights.categorical_cols)}")
             prompt_lines.append("  Top distributions:")
-            for col, cat_stats in list(categorical_insights.items())[:3]:
+            
+            # Find if there is a numeric column representing counts/totals
+            val_col = None
+            if self.insights.numeric_cols:
+                count_cols = [c for c in self.insights.numeric_cols 
+                              if any(x in str(c).lower() for x in ['count', 'total', 'sum', 'frequency', 'value', 'amount', 'pct', 'ratio', 'percentage'])]
+                if count_cols:
+                    val_col = count_cols[0]
+                else:
+                    val_col = self.insights.numeric_cols[0]
+
+            for col in self.insights.categorical_cols[:3]:
+                cat_stats = categorical_insights.get(col, {})
                 top_categories = cat_stats.get('top_categories', {})
-                category_summary = ', '.join([
-                    f"{k} (count: {v})" for k, v in list(top_categories.items())[:3]
-                ])
+                if not top_categories:
+                    continue
+                
+                # Compute actual shares programmatically to prevent LLM calculation errors
+                if val_col:
+                    try:
+                        cat_totals = self.df.groupby(col)[val_col].sum()
+                        cat_totals.index = cat_totals.index.astype(str)
+                        total_val = cat_totals.sum()
+                        denom = max(1, total_val)
+                        shares = {k: cat_totals.get(k, 0) / denom * 100 for k in top_categories.keys()}
+                        raw_vals = {k: cat_totals.get(k, 0) for k in top_categories.keys()}
+                    except Exception:
+                        cat_counts = self.df[col].value_counts()
+                        cat_counts.index = cat_counts.index.astype(str)
+                        total_val = cat_counts.sum()
+                        denom = max(1, total_val)
+                        shares = {k: cat_counts.get(k, 0) / denom * 100 for k in top_categories.keys()}
+                        raw_vals = {k: cat_counts.get(k, 0) for k in top_categories.keys()}
+                else:
+                    cat_counts = self.df[col].value_counts()
+                    cat_counts.index = cat_counts.index.astype(str)
+                    total_val = cat_counts.sum()
+                    denom = max(1, total_val)
+                    shares = {k: cat_counts.get(k, 0) / denom * 100 for k in top_categories.keys()}
+                    raw_vals = {k: cat_counts.get(k, 0) for k in top_categories.keys()}
+
+                # Check if we can find parent/overall context from previous memory
+                parent_totals = {}
+                parent_total_val = None
+                if "conversation_memory" in st.session_state:
+                    memory = st.session_state.conversation_memory
+                    if memory and memory.get("history"):
+                        prev_entry = memory["history"][-1]
+                        prev_records = prev_entry.get("records")
+                        if prev_records and isinstance(prev_records, list):
+                            try:
+                                prev_df = pd.DataFrame(prev_records)
+                                if col in prev_df.columns:
+                                    # Identify if there is a numeric count column in previous df
+                                    prev_numeric = prev_df.select_dtypes(include="number").columns.tolist()
+                                    prev_val_col = None
+                                    if prev_numeric:
+                                        prev_count_cols = [c for c in prev_numeric 
+                                                           if any(x in str(c).lower() for x in ['count', 'total', 'sum', 'frequency', 'value', 'amount', 'pct', 'ratio', 'percentage'])]
+                                        prev_val_col = prev_count_cols[0] if prev_count_cols else prev_numeric[0]
+                                    
+                                    if prev_val_col:
+                                        parent_cat_totals = prev_df.groupby(col)[prev_val_col].sum()
+                                    else:
+                                        parent_cat_totals = prev_df[col].value_counts()
+                                    
+                                    parent_cat_totals.index = parent_cat_totals.index.astype(str)
+                                    parent_total_val = parent_cat_totals.sum()
+                                    parent_totals = parent_cat_totals.to_dict()
+                            except Exception as pe:
+                                logger.warning("Could not compute parent overall context totals: %s", pe)
+
+                category_summary_parts = []
+                for k in top_categories.keys():
+                    val = raw_vals.get(k, 0)
+                    share = shares.get(k, 0.0)
+                    if isinstance(val, (int, np.integer)):
+                        val_str = f"{int(val):,}"
+                    else:
+                        val_str = f"{val:,.2f}"
+                    
+                    # Add parent overall share text if context exists and parent list is strictly larger
+                    if parent_total_val and parent_total_val > 0 and len(parent_totals) > len(self.df):
+                        p_share = (val / parent_total_val * 100)
+                        category_summary_parts.append(
+                            f"{k} (value: {val_str}, share in this comparison: {share:.1f}%, share of overall volume across all {len(parent_totals)} present categories: {p_share:.1f}%)"
+                        )
+                    else:
+                        category_summary_parts.append(f"{k} (value: {val_str}, share: {share:.1f}%)")
+                
+                category_summary = ', '.join(category_summary_parts)
                 prompt_lines.append(
                     f"    * {col}: Unique count={cat_stats['unique_count']}, Top occurrences={category_summary}"
                 )
@@ -362,12 +514,21 @@ class InsightVisualizer:
             "1. Strictly maintain the exact markdown headers (e.g. '## Executive Trend Overview', '## Key Drivers & Concentrations', '## Strategic Client Implications') and bullet point list structure.\n"
             "2. Improve sentence formation: make sentences flow naturally, sound elegant, premium, and authoritative. Avoid clunky, repetitive, or robotic sentence structures.\n"
             "3. Ensure the tone is highly tailored for business leaders, decision-makers, and clients. Use executive-level vocabulary (e.g. concentration risk, portfolio optimization, credit risk exposure) instead of generic phrases.\n"
-            "4. Retain all key statistics, numbers, percentages, and names from the draft. Do not invent or change any figures. Ensure comparative metrics like percentage differences are preserved.\n"
-            "5. Keep the total length concise, executive-focused, and under 160 words.\n"
-            "6. Output ONLY the polished markdown. Do not include any intro, outro, meta-commentary, or surrounding markdown code blocks (e.g. do not wrap in ```markdown or ```)."
+            "4. Retain all key statistics, raw numbers, counts, and names from the draft. Do not invent or change any figures. Ensure comparative metrics like volume differences and overall share/volume counts (e.g. raw case counts) are explicitly preserved.\n"
+            "4b. MATHEMATICAL ACCURACY GUARD: Ensure all numbers, raw counts, and volume differences are mathematically correct and exactly match the draft data. Do not hallucinate or perform incorrect arithmetic calculations.\n"
+            "5. Keep the total length concise, short, sharp, highly informative, executive-focused, and under 150 words.\n"
+            "6. Output ONLY the polished markdown. Do not include any intro, outro, meta-commentary, or surrounding markdown code blocks (e.g. do not wrap in ```markdown or ```).\n"
+            "7. CRITICAL STYLE FILTER: Ensure there are absolutely no introductory filler phrases (such as 'The data shows', 'The records contain', 'The analysis reveals', 'The table indicates', or 'According to the data'). Start sentences directly and assertively with the facts and findings themselves (e.g. write 'DM holds a slightly higher count of 2,545 compared to VP's 2,455...' instead of 'The data shows that DM has...').\n"
+            "8. CRITICAL CONTENT FILTER: Scan the draft analysis for any sentences, clauses, or bullet points containing 'not provided', 'not available', 'N/A', 'none', or 'not specified'. You MUST completely remove or filter out those bullet points, phrases, or sentences. NEVER output placeholder phrases. If a category (e.g., chapter or risk profile) was not provided in the draft, omit that bullet point or information completely.\n"
+            "9. CRITICAL PERCENTAGE FILTER: Do NOT include standard percentage share or distribution values (like '51.4%' or '100.0%') in your polished output, and replace them with raw counts (e.g., '57 out of 111 total filings'). However, you MUST preserve and include any 'Percentage Change' values containing comparison delta arrows (such as '+21.7% ▲' or '-1.7% ▼') to represent comparison deltas in the executive overview and key drivers sections. Do not strip out percentage change values containing delta arrows.\n"
+            "10. TARGET END-USER UNDERSTANDING: Present findings in a highly clear, digestible, and professional business format that directly addresses the user's analytical queries and makes concentration metrics clear to credit risk managers."
         )
         try:
-            refined_response = call_llm_with_cache(prompt, temperature=0.6)
+            refined_response = call_llm_with_cache(
+                prompt,
+                model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+                temperature=0.6
+            )
             return refined_response.strip() if refined_response else raw_summary
         except Exception as e:
             logger.warning("Refining summary for end-user failed: %s", e)
@@ -379,7 +540,11 @@ class InsightVisualizer:
             numeric_insights = self.insights.get_numeric_insights()
             categorical_insights = self.insights.get_categorical_insights()
             prompt = self._build_llm_summary_prompt(stats, numeric_insights, categorical_insights, user_query=user_query)
-            llm_response = call_llm_with_cache(prompt, temperature=0.1)
+            llm_response = call_llm_with_cache(
+                prompt,
+                model="anthropic.claude-3-5-sonnet-20240620-v1:0",
+                temperature=0.1
+            )
             if llm_response:
                 return self._refine_summary_for_enduser(llm_response.strip(), user_query=user_query)
             return None
@@ -686,6 +851,7 @@ class InsightVisualizer:
             num_lower = str(num_col).lower()
             agg_func = 'mean' if any(x in num_lower for x in ["avg", "mean", "score", "pct", "ratio", "percentage"]) else 'sum'
             plot_df = self.df.groupby([c1, c2])[num_col].agg(agg_func).reset_index()
+            plot_df[c2] = plot_df[c2].astype(str)
             if self._is_year_column(c1, plot_df[c1]):
                 plot_df["_sort_key"] = pd.to_numeric(plot_df[c1], errors="coerce")
                 plot_df = plot_df.sort_values("_sort_key").drop(columns=["_sort_key"])
@@ -756,6 +922,7 @@ class InsightVisualizer:
 
         top_c1 = self.df[c1].value_counts().head(15).index
         plot_df = self.df[self.df[c1].isin(top_c1)].copy()
+        plot_df[c2] = plot_df[c2].astype(str)
 
         x_label = c1.replace('_', ' ').title()
         y_label = val.replace('_', ' ').title()
@@ -764,9 +931,11 @@ class InsightVisualizer:
         fig = px.bar(
             plot_df, x=c1, y=val, color=c2,
             barmode='group',
+            text=plot_df[val].apply(lambda v: f"{int(v):,}"),
             color_discrete_sequence=CHART_COLORS,
             labels={c1: x_label, val: y_label, c2: hue_label},
         )
+        fig.update_traces(textposition='outside')
         fig.update_layout(
             **_plotly_layout(
                 title=f"{y_label} by {x_label} & {hue_label}",
@@ -818,12 +987,16 @@ class InsightVisualizer:
             return
         x_col, y_col = self.insights.numeric_cols[0], self.insights.numeric_cols[1]
         color_col = self.insights.categorical_cols[0] if self.insights.categorical_cols else None
+        
+        plot_df = self.df.copy()
+        if color_col:
+            plot_df[color_col] = plot_df[color_col].astype(str)
 
         x_label = x_col.replace('_', ' ').title()
         y_label = y_col.replace('_', ' ').title()
 
         fig = px.scatter(
-            self.df, x=x_col, y=y_col,
+            plot_df, x=x_col, y=y_col,
             color=color_col,
             color_discrete_sequence=CHART_COLORS,
             opacity=0.75,
@@ -989,14 +1162,14 @@ Respond with ONLY ONE word from the options above: bar, pie, trend, correlation,
     def render_insights(self, chart_type: str = "auto", user_query: str = None):
         """Main method to render all insights"""
         # Executive summary always shown
-        self.render_executive_summary()
+        self.render_executive_summary(user_query=user_query)
         st.divider()
 
         # LLM-driven chart type selection when auto
         if chart_type == "auto" and user_query:
             llm_chart_type = self._decide_chart_type_with_llm(user_query)
             if llm_chart_type != "auto":
-                st.info(f" Selecting '{llm_chart_type}' chart based on your query.")
+                # st.info(f" Selecting '{llm_chart_type}' chart based on your query.")
                 chart_type = llm_chart_type
 
         # Ã¢â€â‚¬Ã¢â€â‚¬ Dispatch to the correct renderer Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬

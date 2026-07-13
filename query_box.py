@@ -45,10 +45,48 @@ def format_table(df):
         df.columns = [to_bold_unicode(str(col).upper()) for col in df.columns]
     return df
 
-def render_centered_table(df):
+def render_centered_table(df, user_query=None):
     if df is None or df.empty:
         return
-    html_table = format_table(df).to_html(index=False, border=0, classes="centered-results-table-el")
+    
+    # Check if a comparison column should be added
+    if user_query:
+        q_lower = user_query.lower()
+        is_comparison = any(kw in q_lower for kw in ["compare", "vs", "versus", "difference"])
+        if is_comparison:
+            # Find the most appropriate numeric value/measure column
+            numeric_cols = df.select_dtypes(include="number").columns.tolist()
+            if len(df) >= 2 and numeric_cols:
+                val_col = None
+                value_keywords = ['count', 'total', 'frequency', 'value', 'sum', 'amount', 'pct', 'ratio', 'percentage']
+                # Prefer columns containing value-like keywords
+                for col in numeric_cols:
+                    if any(kw in str(col).lower() for kw in value_keywords):
+                        val_col = col
+                        break
+                # Fallback to the last numeric column (usually the aggregate measure in SQL grouping queries)
+                if not val_col:
+                    val_col = numeric_cols[-1]
+                
+                baseline = float(df.iloc[0][val_col])
+                if baseline != 0:
+                    df = df.copy()
+                    pct_changes = []
+                    for idx, row in df.iterrows():
+                        if idx == 0:
+                            pct_changes.append("Baseline")
+                        else:
+                            val = float(row[val_col])
+                            pct = ((val - baseline) / baseline) * 100
+                            if pct > 0:
+                                pct_changes.append(f'<span style="color:#16a34a; font-weight:600;">+{pct:.1f}% ▲</span>')
+                            elif pct < 0:
+                                pct_changes.append(f'<span style="color:#dc2626; font-weight:600;">{pct:.1f}% ▼</span>')
+                            else:
+                                pct_changes.append("0.0%")
+                    df["Percentage Change"] = pct_changes
+
+    html_table = format_table(df).to_html(index=False, border=0, classes="centered-results-table-el", escape=False)
     st.markdown(f"""
 <style>
 .centered-results-table {{
@@ -1065,6 +1103,11 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             "18. consumer_type: Type of debtor/consumer. Values: Individual, Business, Corporate, Partnership, Trust, SME. (e.g. 'Partnership cases' -> 'Partnership', 'business cases' -> 'Business', 'Corporate' -> 'Corporate')\n"
             "19. prose_indicator: Whether debtor is self-represented (pro se). 'Y' = pro se, 'N' = has attorney.\n"
             "20. has_no_attorney: Boolean flag (true/false). Set to true when user says 'without attorney', 'no attorney', 'no lawyer'.\n\n"
+            "CRITICAL CONTEXT ISOLATION RULE:\n"
+            "- The 'Recent Conversation History' above is provided ONLY as context to resolve pronouns (e.g. 'it', 'that', 'those', 'same state') or vague references in the current question.\n"
+            "- NEVER carry forward filter values (e.g. state, chapter, status, date_or_year, client_name, match_code) from previous SQL queries or previous questions into the current extraction UNLESS the current question explicitly references them by name or pronoun.\n"
+            "- If the current question explicitly names a NEW specific value (e.g. 'Texas', 'Chapter 7', 'Active'), extract ONLY that value — do NOT add or merge any values seen in previous SQL queries.\n"
+            "- Example: If the previous SQL was 'WHERE state IN (''TX'', ''AZ'')' and the current question is 'Pie chart showing the distribution of bankruptcy chapters in Texas', extract state='TX' ONLY. Do NOT include 'AZ' just because it appeared in a prior SQL query.\n\n"
             "KEY PARSING RULE FOR COLLOQUIAL / INCORRECT ENGLISH:\n"
             "- Suffixes like 'wise' (e.g. yearwise, chapterwise, statewise, matchcodewise) specify fields that must be placed inside the 'group_by_fields' list (e.g. ['year'], ['chapter'], ['state'], ['match_code']).\n"
             "- Abbreviated filters like 'P2 matchcode' should set 'match_code' to 'P2'.\n"
@@ -1145,6 +1188,56 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             '  "aggregation_type": "count",\n'
             '  "group_by_fields": ["attorney_name"],\n'
             '  "limit": null,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example State Plural Superlative:\n"
+            "Question: \"Which states have the highest number of bankruptcy filings?\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": null,\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["state"],\n'
+            '  "limit": null,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example State Singular Superlative:\n"
+            "Question: \"Which state has the most bankruptcy filings?\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": null,\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["state"],\n'
+            '  "limit": 1,\n'
             '  "sort_order": "desc",\n'
             '  "record_type": null,\n'
             '  "consumer_type": null,\n'
@@ -1769,6 +1862,11 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "10. If a specific year (e.g., '2024') or relative timeframe (e.g., 'last 12 months', 'last year') is requested in the user query and present in `date_or_year` in EXTRACTED ENTITIES, you MUST include a WHERE filter for that time. For a specific year, use (e.g., `strftime('%Y', date_filed) = '2024'`). For a relative timeframe like 'last 12 months', use date math: `WHERE date_filed >= DATE((SELECT MAX(date_filed) FROM uploaded_data), '-12 months')`. DO NOT retrieve or aggregate over all dates when a specific time is explicitly requested. If the user asks for a distribution/breakdown within a single year (e.g., '2024 distribution') but does not specify another grouping attribute (like chapter or state), group by month (e.g. `strftime('%m', date_filed) AS month`) to show a meaningful distribution.\n"
             "11. If the user requests sorting or limiting (e.g., 'top 3 risk cases', 'highest score cases', or `limit` and `sort_by_field` are set in EXTRACTED ENTITIES), you MUST construct a SELECT query that retrieves case records (selecting relevant columns like match_score, first_name, last_name, client_name, match_code, status, date_filed, case_number), order by the mapped `sort_by_field` column (e.g. match_score for risk/score) according to the `sort_order` (e.g. `ORDER BY match_score DESC`), and apply the `limit` (e.g. `LIMIT 3`). DO NOT group or count unless specifically asked.\n"
             "11b. Pay careful attention to singular vs plural requests! If the user asks for singular (e.g. 'Which state has the most...', 'Which attorney has the highest...'), use `LIMIT 1`. If the user asks for plural without a specific number (e.g. 'Which states have the most...', 'Which attorneys have the highest...'), do NOT use any LIMIT, just use `ORDER BY count DESC`. If a general distribution or grouping over all categories is requested (e.g., 'each year', 'filings by state', 'breakdown by chapter', 'each month'), or if the user asks for BOTH extremes/superlatives (e.g. 'highest and lowest', 'most and least'), do NOT apply any simple LIMIT, but rather use UNION ALL for both extremes as specified in Rule 21. If a specific number is requested (e.g. 'top 3 states'), use that exact limit (e.g. `LIMIT 3`). Do NOT use arbitrary limits like `LIMIT 5` unless specifically requested.\n"
+            "11c. CRITICAL DISTINCTION — 'top N [entity]' vs 'distribution of X for top N [parent]':\n"
+            "  * Pattern A — 'top N of a GROUPED column' (e.g. 'top 3 chapters in Texas', 'top 5 attorneys by count'): The 'top N' limits the GROUP-BY result itself. Use a simple query: `SELECT chapter, COUNT(*) AS count FROM uploaded_data WHERE TRIM(state) = 'TX' GROUP BY chapter ORDER BY count DESC LIMIT 3`. Apply LIMIT N directly on the outer query.\n"
+            "  * Pattern B — 'distribution of X for the top N of another column' (e.g. 'chapter distribution for top 5 states'): The 'top N' filters a PARENT category, not the breakdown. Do NOT apply LIMIT N to the outer query. Instead filter using a subquery: `SELECT state, chapter, COUNT(*) AS count FROM uploaded_data WHERE state IN (SELECT state FROM uploaded_data GROUP BY state ORDER BY COUNT(*) DESC LIMIT 5) GROUP BY state, chapter ORDER BY state, count DESC`.\n"
+            "  * KEY: If the user says 'top N X in [specific filter value]' (e.g. 'top 3 chapters in Texas'), it is Pattern A — use LIMIT. If the user says 'X distribution for top N Y' or 'X by top N Y' (e.g. 'chapter distribution for top 5 states'), it is Pattern B — use subquery, no outer LIMIT.\n"
+            "11d. CRITICAL: Only use Pattern B (subquery) if a distribution of one column (e.g., 'chapter') is requested for the top N of ANOTHER column (e.g., 'state'). If the query only asks for the top N of a single column (e.g., 'top 5 states with most filings', 'Which states have the highest number of filings'), it is NOT Pattern B. Use a simple GROUP BY on that column and apply the LIMIT directly to the outer query (e.g. `SELECT state, COUNT(*) AS count FROM uploaded_data GROUP BY state ORDER BY count DESC LIMIT 5`).\n"
             "12. When consumer_type is specified (e.g. Partnership, Business, Corporate), filter it using `TRIM(consumer_type) = 'value'`.\n"
             "13. When prose_indicator is Y, filter using `TRIM(prose_indicator) = 'Y'`.\n"
             "14. When has_no_attorney is true, filter using: `(TRIM(prose_indicator) = 'Y' OR attorney_first_name IS NULL OR TRIM(attorney_first_name) = '')`.\n"
@@ -1776,7 +1874,9 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "16. When held cases is requested, use status Pending: `TRIM(status) = 'Pending'`.\n"
             "17. When corporate transfers in NY is requested, map 'transfers' to `(TRIM(status) = 'Converted' OR (conversion_date IS NOT NULL AND conversion_date != ''))`.\n"
             "18. When high risk cases are requested, filter by `match_score >= 98`.\n"
-            "19. If the RECENT CONVERSATION HISTORY is present and the current user question is a follow-up query asking for details, a breakdown, or a group-by on the previous query, you must construct a query against the main database table (uploaded_data) that inherits and applies the EXACT filters from the previous query's SQL (e.g. if the previous query was filtered to WHERE TRIM(match_code) IN ('P3', 'M3'), you must include that exact WHERE clause in your new query).\n"
+            "19. If the RECENT CONVERSATION HISTORY is present and the current user question is a follow-up query asking for details, a breakdown, or a group-by on the previous query, you must construct a query against the main database table (uploaded_data) that inherits and applies the EXACT filters from the previous query's SQL (e.g. if the previous query was filtered to WHERE TRIM(match_code) IN ('P3', 'M3'), you must include that exact WHERE clause in your new query). CRITICAL EXCEPTIONS — do NOT inherit from previous SQL when:\n"
+            "   a) The current question explicitly names its OWN filter values for a dimension (e.g., explicitly names a specific state, chapter, or status). Use ONLY the values the user named. Example: previous SQL had 'WHERE state IN (''TX'', ''AZ'')' but user now says 'chapters in Texas' → filter ONLY on TX.\n"
+            "   b) A filter dimension (e.g. status='Active') appears in a prior SQL but is NOT mentioned at all in the current question. Do NOT silently carry forward status, chapter, or other filters from history unless the user explicitly references them (e.g. via 'same status', 'same filter', 'for active cases'). Example: previous SQL filtered status='Active', current question is 'top 3 chapters in Texas' with no mention of status → do NOT add status filter.\n"
             "20. When calculating 'increase', 'growth', or 'change' over time (e.g., 'largest increase over the past year'), use conditional aggregation to subtract the previous period's count from the current period's count. For example: `SUM(CASE WHEN date_filed >= DATE((SELECT MAX(date_filed) FROM uploaded_data), '-12 months') THEN 1 ELSE 0 END) - SUM(CASE WHEN date_filed >= DATE((SELECT MAX(date_filed) FROM uploaded_data), '-24 months') AND date_filed < DATE((SELECT MAX(date_filed) FROM uploaded_data), '-12 months') THEN 1 ELSE 0 END) AS increase`. Group by the requested field and sort by `increase DESC`.\n"
             "21. If the user's question asks for BOTH extremes/superlatives (e.g., 'highest and lowest', 'most and least', 'top and bottom', 'maximum and minimum' count/filings), you MUST construct a query combining the top 1 (ordered count DESC LIMIT 1) and the bottom 1 (ordered count ASC LIMIT 1) using UNION ALL. Enclose each subquery fully in parentheses. Example: `SELECT * FROM (SELECT state, COUNT(*) AS count FROM uploaded_data GROUP BY state ORDER BY count DESC LIMIT 1) UNION ALL SELECT * FROM (SELECT state, COUNT(*) AS count FROM uploaded_data GROUP BY state ORDER BY count ASC LIMIT 1)`.\n"
             "22. If the user asks for a percentage or count of a specific subset in the 'top' item (e.g., 'percentage of Chapter 7 cases in the top state'), do NOT use a GROUP BY on the outer query if it causes NULL rows. Instead, find the top item using a subquery and filter the main query by it, then calculate the single percentage value across that filtered set.\n"
@@ -1787,9 +1887,20 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "   - USE DATE('now') instead of NOW() or CURDATE()\n"
             "   - USE DATE(date_column, '+30 days') or DATE(date_column, '-1 month') instead of DATE_ADD/DATE_SUB\n"
             "   - USE CAST(JULIANDAY(date_a) - JULIANDAY(date_b) AS INTEGER) instead of DATEDIFF(date_a, date_b)\n"
-            "   - DO NOT USE STATISTICAL FUNCTIONS: STDDEV, VARIANCE, CORR, COVAR\n\n"
+            "   - DO NOT USE STATISTICAL FUNCTIONS: STDDEV, VARIANCE, CORR, COVAR\n"
+            "24. CRITICAL: NEVER include a WHERE clause filter for a column unless a specific filter value for that column is explicitly set to a non-null value in EXTRACTED ENTITIES. For example, if 'state' is null in EXTRACTED ENTITIES, you MUST NOT filter by state in the WHERE clause (do not use WHERE state = 'TX', WHERE TRIM(state) = 'FL', etc.). Mappings only indicate which columns exist, they do NOT justify adding filters for those columns if the entity value is null.\n\n"
             "FEW-SHOT EXAMPLES:\n"
             "Please Refer to the below examples for Query Generations:\n\n"
+            "Example top N chapters in state (Pattern A — LIMIT on grouped column):\n"
+            "Question: \"Identify the top 3 chapters by count in Texas\"\n"
+            "Entities: {\"state\": \"TX\", \"limit\": 3, \"sort_order\": \"desc\", \"sort_by_field\": \"count\", \"group_by_fields\": [\"chapter\"], \"aggregation_type\": \"count\"}\n"
+            "Mappings: {\"state\": \"state\", \"group_by_fields\": [\"chapter\"]}\n"
+            "Sample SQL: SELECT chapter, COUNT(*) AS count FROM uploaded_data WHERE TRIM(state) = 'TX' GROUP BY chapter ORDER BY count DESC LIMIT 3\n\n"
+            "Example chapter distribution for top N states (Pattern B — subquery, no outer LIMIT):\n"
+            "Question: \"What is the chapter distribution for the top 5 states?\"\n"
+            "Entities: {\"limit\": 5, \"sort_order\": \"desc\", \"group_by_fields\": [\"state\", \"chapter\"], \"aggregation_type\": \"count\"}\n"
+            "Mappings: {\"group_by_fields\": [\"state\", \"chapter\"]}\n"
+            "Sample SQL: SELECT state, chapter, COUNT(*) AS count FROM uploaded_data WHERE state IN (SELECT state FROM uploaded_data GROUP BY state ORDER BY COUNT(*) DESC LIMIT 5) GROUP BY state, chapter ORDER BY state, count DESC\n\n"
             "Example 1:\n"
             "Question: \"P2 matchcode yearwise distribution\"\n"
             "Entities: {\"match_code\": \"P2\", \"group_by_fields\": [\"year\"], \"aggregation_type\": \"count\"}\n"
@@ -1905,6 +2016,16 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "Entities: {\"group_by_fields\": [\"state\"], \"aggregation_type\": \"count\"}\n"
             "Mappings: {\"group_by_fields\": [\"state\"]}\n"
             "Sample SQL: SELECT state, COUNT(*) AS count FROM uploaded_data GROUP BY state HAVING COUNT(*) > 1000 ORDER BY count DESC\n\n"
+            "Example Chapter Distribution for Top 5 States with active filter:\n"
+            "Question: \"Show the count of cases grouped by chapter column for the top 5 states where the status is Active\"\n"
+            "Entities: {\"status\": \"Active\", \"group_by_fields\": [\"state\", \"chapter\"], \"limit\": 5, \"aggregation_type\": \"count\"}\n"
+            "Mappings: {\"status\": \"status\", \"group_by_fields\": [\"state\", \"chapter\"], \"limit\": 5}\n"
+            "Sample SQL: SELECT state, chapter, COUNT(*) AS count FROM uploaded_data WHERE TRIM(status) = 'Active' AND state IN (SELECT state FROM uploaded_data WHERE TRIM(status) = 'Active' GROUP BY state ORDER BY COUNT(*) DESC LIMIT 5) GROUP BY state, chapter ORDER BY state, count DESC\n\n"
+            "CRITICAL FINAL CHECK FOR SAFETY AND CORRECTNESS:\n"
+            "1. Look at EXTRACTED ENTITIES. If a key is null (e.g. 'state' is null, 'status' is null, 'chapter' is null), you MUST NOT filter by that column in the query's WHERE clause. Mappings are general target columns, NOT filters. Only filter by a column if a specific non-null value is set for it in EXTRACTED ENTITIES.\n"
+            "2. Do NOT copy state filters (like 'TX' or 'FL') or status filters (like 'Active') from the few-shot examples or sample data unless they were explicitly set to non-null values in the input EXTRACTED ENTITIES.\n"
+            "3. If only a single column is requested for grouping/counting (e.g. 'state' in group_by_fields), do NOT select or group by any other columns like 'chapter' or 'status'.\n"
+            "4. Only use Pattern B (subquery) if a distribution of one column (e.g., 'chapter') is requested for the top N of ANOTHER column (e.g., 'state'). For any single column superlative query (e.g. 'Which state has the highest filings', 'top 1 state', 'top 5 states'), do NOT use a subquery under any circumstances. Use a simple query with a GROUP BY and an outer LIMIT clause (e.g., SELECT state, COUNT(*) AS count FROM uploaded_data GROUP BY state ORDER BY count DESC LIMIT 1).\n\n"
             "Output ONLY a JSON object with a single key `sql` whose value is the built SQLite query string:\n"
             "{\n"
             '  "sql": "SELECT ..."\n'
@@ -1938,6 +2059,68 @@ def execute_sqlite(sql_query: str) -> pd.DataFrame:
     return execute_sql_query(sql_query)
 
 
+def normalize_extracted_entities(entities: dict) -> dict:
+    """Helper to programmatically normalize entities to match database schema casing conventions."""
+    if not entities:
+        return entities
+    
+    # Uppercase client_name if present
+    if "client_name" in entities and entities["client_name"]:
+        if isinstance(entities["client_name"], list):
+            entities["client_name"] = [str(x).upper().strip() for x in entities["client_name"]]
+        else:
+            entities["client_name"] = str(entities["client_name"]).upper().strip()
+            
+    # Uppercase match_code if present
+    if "match_code" in entities and entities["match_code"]:
+        if isinstance(entities["match_code"], list):
+            entities["match_code"] = [str(x).upper().strip() for x in entities["match_code"]]
+        else:
+            entities["match_code"] = str(entities["match_code"]).upper().strip()
+            
+    # Uppercase state if present (ensure NY, CA etc.)
+    if "state" in entities and entities["state"]:
+        if isinstance(entities["state"], list):
+            entities["state"] = [str(x).upper().strip() if len(str(x).strip()) == 2 else str(x).title().strip() for x in entities["state"]]
+        else:
+            val = str(entities["state"]).strip()
+            if len(val) == 2:
+                entities["state"] = val.upper()
+            else:
+                entities["state"] = val.title()
+                
+    # Title case status (e.g. active -> Active, closed -> Closed)
+    if "status" in entities and entities["status"]:
+        if isinstance(entities["status"], list):
+            entities["status"] = [str(x).title().strip() for x in entities["status"]]
+        else:
+            entities["status"] = str(entities["status"]).title().strip()
+            
+    # Title case record_type (e.g. new -> New)
+    if "record_type" in entities and entities["record_type"]:
+        if isinstance(entities["record_type"], list):
+            entities["record_type"] = [str(x).title().strip() for x in entities["record_type"]]
+        else:
+            entities["record_type"] = str(entities["record_type"]).title().strip()
+            
+    # Title case consumer_type (e.g. business -> Business)
+    if "consumer_type" in entities and entities["consumer_type"]:
+        if isinstance(entities["consumer_type"], list):
+            entities["consumer_type"] = [str(x).title().strip() for x in entities["consumer_type"]]
+        else:
+            entities["consumer_type"] = str(entities["consumer_type"]).title().strip()
+            
+    # Normalize prose_indicator to 'Y' or 'N'
+    if "prose_indicator" in entities and entities["prose_indicator"]:
+        val = str(entities["prose_indicator"]).upper().strip()
+        if val in ['Y', 'YES', 'TRUE', '1']:
+            entities["prose_indicator"] = 'Y'
+        elif val in ['N', 'NO', 'FALSE', '0']:
+            entities["prose_indicator"] = 'N'
+            
+    return entities
+
+
 def generate_sql_from_question(user_question, schema, conversation_memory=None, token_usage=None, main_schema=None, temp_table_name=None, temp_table_schema=None):
     """Refactored pipeline to generate, validate, and execute SQL based on user question"""
     try:
@@ -1949,6 +2132,7 @@ def generate_sql_from_question(user_question, schema, conversation_memory=None, 
         
         # Step 2: Entity Extractor
         entities = entity_extractor(user_question, intent, conversation_memory, token_usage)
+        entities = normalize_extracted_entities(entities)
         logger.info("Pipeline Step 2: Entity Extractor -> %s", json.dumps(entities))
         
         # Step 3: Column Mapper
@@ -2633,6 +2817,9 @@ def is_followup_question(user_query: str, conversation_history: dict) -> bool:
     # FALSE-POSITIVE GUARD – penalise if a wholly new entity is introduced
     # or if the query is a request for a fresh complete distribution ("all", "each", "every")
     # ─────────────────────────────────────────────────────────────────────────
+    # Detect brand-new named entity references in the current query
+    penalty = 0.0
+
     # Fresh distribution request guard
     FRESH_DISTRIBUTION_PATTERNS = [
         r'\ball\s+chapters\b', r'\ball\s+states\b', r'\ball\s+status\b', r'\ball\s+match\b', r'\ball\s+client\b', r'\ball\s+attorney\b',
@@ -2661,9 +2848,6 @@ def is_followup_question(user_query: str, conversation_history: dict) -> bool:
         'nj', 'va', 'wa', 'az', 'ma', 'tn', 'in', 'mo', 'md', 'wi',
         'mn', 'co', 'al', 'sc', 'la', 'ky', 'or', 'ok', 'ct', 'ut',
     }
-
-    # Detect brand-new named entity references in the current query
-    penalty = 0.0
 
     # New year that wasn't in previous query
     year_matches = re.findall(r'\b(20\d{2}|19\d{2})\b', query_lower)
@@ -2841,6 +3025,33 @@ def _handle_user_query(user_query, schema, active_schema):
         )
         st.session_state.is_suggested_followup = False
         logger.info("Check if its asking a Follow-up question | is_followup=%s | is_suggested_followup=%s", is_followup, is_suggested_followup)
+
+        if "followup_level" not in st.session_state:
+            st.session_state.followup_level = 0
+
+        if is_followup:
+            st.session_state.followup_level += 1
+            logger.info("Follow-up level: %d / 3", st.session_state.followup_level)
+            if st.session_state.followup_level > 3:
+                logger.info("Follow-up level exceeds 3. Resetting memory and clearing active dataset.")
+                st.session_state.conversation_memory = _initialize_conversation_memory()
+                if st.session_state.temp_table_name:
+                    drop_temporary_table(st.session_state.temp_table_name)
+                    st.session_state.temp_table_name = None
+                    st.session_state.temp_table_schema = None
+                    st.session_state.temp_table_source_query = None
+                    st.session_state.temp_table_dataframe = None
+                st.session_state.followup_level = 0
+                is_followup = False
+                
+                # Append a friendly system message to the chat so the user sees it in the history
+                # reset_notification = "🔄 **Follow-up limit (level-3) reached on the current dataset.** Conversational memory has been automatically reset for fresh exploration. Suggestion chips have been updated."
+                # st.session_state.messages.append({
+                #     "role": "assistant",
+                #     "content": reset_notification
+                # })
+        else:
+            st.session_state.followup_level = 0
         
         # Determine if we should query the temporary table or fallback to the main database
         use_temp_table = False
@@ -2863,20 +3074,22 @@ def _handle_user_query(user_query, schema, active_schema):
             
         if use_temp_table:
             working_schema = st.session_state.temp_table_schema
-            st.info(" **Querying previous result set**")
+            # st.info(" **Querying previous result set**")
             logger.info("Using temporary table for follow-up query | table=%s", working_schema.get('table_name'))
         else:
             working_schema = active_schema if active_schema else schema
             if is_followup:
                 logger.info("Querying main database for follow-up query using conversation history.")
             if any(kw in user_query.lower() for kw in ['clear', 'reset', 'new query', 'fresh', 'different']):
+                st.session_state.conversation_memory = _initialize_conversation_memory()
+                st.session_state.followup_level = 0
                 if st.session_state.temp_table_name:
                     drop_temporary_table(st.session_state.temp_table_name)
                     st.session_state.temp_table_name = None
                     st.session_state.temp_table_schema = None
                     st.session_state.temp_table_source_query = None
                     st.session_state.temp_table_dataframe = None
-                    st.info(" Cleared previous result set. Starting fresh...")
+                    st.info("Cleared previous result set. Starting fresh...")
         
         generation_token_usage = {}
         validation_token_usage = {}
@@ -2890,7 +3103,7 @@ def _handle_user_query(user_query, schema, active_schema):
 
         if cached_response is not None:
             st.success(" Cached result found for repeated query")
-            render_centered_table(cached_response["dataframe"])
+            render_centered_table(cached_response["dataframe"], user_query=user_query)
             if cached_response.get("has_insights"):
                 with st.expander(" View Insights and Charts", expanded=True):
                     generate_insights(
@@ -3074,7 +3287,7 @@ def _handle_user_query(user_query, schema, active_schema):
             success_msg = f"Here's the chart for the active dataset ({len(result_df):,} records)."
 
         st.markdown(success_msg)
-        render_centered_table(result_df)
+        render_centered_table(result_df, user_query=user_query)
         if result_df is not None and not result_df.empty:
             old_temp_table = st.session_state.get("temp_table_name")
             temp_table_name, temp_schema = create_temporary_table_from_dataframe(result_df, final_query)
@@ -3168,7 +3381,7 @@ def render_query_box_tab(schema, active_schema):
                     if content.get("type") == "table":
                         st.markdown(content.get("message", "Result:"))
                         df_res = pd.DataFrame(content.get("data", []))
-                        render_centered_table(df_res)
+                        render_centered_table(df_res, user_query=msg.get("user_query"))
                     elif content.get("type") == "text":
                         st.markdown(content.get("message", ""))
                     else:
@@ -3178,7 +3391,7 @@ def render_query_box_tab(schema, active_schema):
 
                 if msg["role"] == "assistant":
                     if "dataframe" in msg and msg["dataframe"] is not None:
-                        render_centered_table(msg["dataframe"])
+                        render_centered_table(msg["dataframe"], user_query=msg.get("user_query"))
 
                     if msg.get("has_insights") and msg.get("user_query"):
                         with st.expander("View Insights and Charts", expanded=True):
@@ -3304,7 +3517,7 @@ def render_query_box_tab(schema, active_schema):
                 for idx, txt_q in enumerate(suggestions.get("textual", [])):
                     if st.button(txt_q, key=f"suggest_text_{idx}", use_container_width=True):
                         st.session_state.suggested_question_selected = txt_q
-                        st.session_state.is_suggested_followup = True
+                        st.session_state.is_suggested_followup = (history_len > 0)
                         st.rerun()
 
             with col_v:
@@ -3313,7 +3526,7 @@ def render_query_box_tab(schema, active_schema):
                 for idx, vis_q in enumerate(suggestions.get("visual", [])):
                     if st.button(vis_q, key=f"suggest_visual_{idx}", use_container_width=True):
                         st.session_state.suggested_question_selected = vis_q
-                        st.session_state.is_suggested_followup = True
+                        st.session_state.is_suggested_followup = (history_len > 0)
                         st.rerun()
 
             st.write("")  # spacer
@@ -3365,6 +3578,8 @@ def render_query_box_tab(schema, active_schema):
                 st.session_state.temp_table_schema = None
                 st.session_state.temp_table_source_query = None
                 st.session_state.temp_table_dataframe = None
+                st.session_state.conversation_memory = _initialize_conversation_memory()
+                st.session_state.followup_level = 0
                 st.rerun()
 
     # Replace chat input up-arrow with 'Ask' text via CSS
