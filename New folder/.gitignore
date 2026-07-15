@@ -1,0 +1,23 @@
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# Local SQLite databases and caches
+data.db
+.litellm_prompt_cache.db
+
+# Log files
+*.log
+bankruptcy_genbi.log
+
+# Streamlit configurations (if dynamic or user-specific)
+.streamlit/config.toml
+.streamlit/secrets.toml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables (secrets)
+.env
