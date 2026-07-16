@@ -3429,11 +3429,11 @@ def render_query_box_tab(schema, active_schema):
                         df_res = pd.DataFrame(content.get("data", []))
                         render_centered_table(df_res, user_query=msg.get("user_query"))
                     elif content.get("type") == "text":
-                        st.markdown(content.get("message", ""))
+                        st.markdown(content.get("message", ""), unsafe_allow_html=True)
                     else:
                         st.write(content)
                 else:
-                    st.markdown(content)
+                    st.markdown(content, unsafe_allow_html=True)
 
                 if msg["role"] == "assistant":
                     if "dataframe" in msg and msg["dataframe"] is not None:

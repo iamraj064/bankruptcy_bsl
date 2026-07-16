@@ -1657,7 +1657,7 @@ def main():
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": " **Welcome to GenBI Assistant!** "
+                "content": "<span style='font-size: 1.3rem; font-weight: 800;'>Welcome to GenBI Assistant!</span>"
             }
         ]
 
@@ -1706,18 +1706,18 @@ def main():
             st.session_state.selected_tab = st.session_state.pop("nav_redirect")
 
         if "selected_tab" not in st.session_state:
-            st.session_state.selected_tab = "Analytics" if st.session_state.get("data_in_db", False) else "Data"
+            st.session_state.selected_tab = "Exploratory Analysis" if st.session_state.get("data_in_db", False) else "Data Engine"
 
         selected_tab = st.radio(
             "Select Workspace",
-            ["Data", "Analytics", "Forecasting", "AI Assistant"],
+            ["Data Engine", "Exploratory Analysis", "Predictive Analytics", "Conversational AI"],
             key="selected_tab",
             label_visibility="collapsed"
         )
 
 
         # Analytics Filter Panel - frozen in sidebar
-        if selected_tab == "Analytics" and st.session_state.get("data_in_db", False):
+        if selected_tab == "Exploratory Analysis" and st.session_state.get("data_in_db", False):
             st.markdown("---")
             st.markdown(
                 """<div style="font-family:'Outfit',sans-serif;font-size:0.85rem;font-weight:700;
@@ -1767,11 +1767,11 @@ def main():
             sel_chapter = st.selectbox("Bankruptcy Chapter", ["All Chapters"] + _chapter_list, key="sb_chapter")
             chapter_filter = None if sel_chapter == "All Chapters" else sel_chapter
 
-            sel_status = st.selectbox("Case Status", ["All Statuses"] + _status_list, key="sb_status")
-            status_filter = None if sel_status == "All Statuses" else sel_status
+            sel_status = st.selectbox("Case Status", ["All"] + _status_list, key="sb_status")
+            status_filter = None if sel_status == "All" else sel_status
 
-            sel_client = st.selectbox("Client", ["All Clients"] + _client_list, key="sb_client")
-            client_filter = None if sel_client == "All Clients" else sel_client
+            sel_client = st.selectbox("Client", ["All"] + _client_list, key="sb_client")
+            client_filter = None if sel_client == "All" else sel_client
 
             # Store in session state for use in the main body
             st.session_state["_analytics_filters"] = {
@@ -1782,7 +1782,7 @@ def main():
             }
 
         # Forecasting Filter Panel - frozen in sidebar
-        if selected_tab == "Forecasting" and st.session_state.get("data_in_db", False):
+        if selected_tab == "Predictive Analytics" and st.session_state.get("data_in_db", False):
             st.markdown("---")
             st.markdown(
                 """<div style="font-family:'Outfit',sans-serif;font-size:0.85rem;font-weight:700;
@@ -1908,9 +1908,9 @@ def main():
     # -----------------------------------------------------------------
     # WORKSPACE: DATA
     # -----------------------------------------------------------------
-    if selected_tab == "Data":
+    if selected_tab == "Data Engine":
         st.subheader("Repository Management")
-        st.markdown("Upload transactional files dynamically to populate the SQLite analytics structure.")
+        st.markdown("Upload Transactional Files dynamically to populate the SQLite Analytics structure.")
 
         uploaded_file = st.file_uploader("Upload CSV database...", type=["csv"], help="Upload bankruptcy CSV data. Columns will be parsed dynamically.")
 
@@ -1986,7 +1986,7 @@ def main():
     # -----------------------------------------------------------------
     # WORKSPACE: ANALYTICS (OPTIMIZED INTERACTIVE DRILL-DOWN & CASE INSPECTOR)
     # -----------------------------------------------------------------
-    elif selected_tab == "Analytics":
+    elif selected_tab == "Exploratory Analysis":
         # st.subheader("Case Portfolio Analytics")
 
         if not st.session_state.data_in_db:
@@ -2083,25 +2083,25 @@ def main():
                     f"""
 <div style="background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); border: 1px solid #c7d2fe; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; justify-content: space-between;">
 <div style="flex: 1.6 1 420px; min-width: 300px;">
-<div style="font-size:0.75rem; color:#6366f1; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; margin-bottom:0.3rem;"> Executive Summery Insights</div>
+<div style="font-size:1.15rem; color:#6366f1; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; margin-bottom:0.3rem;"> Executive Summary Insights</div>
 <div style="font-size:0.82rem; color:#475569; margin-bottom:0.5rem;">{_scope_label}</div>
-<div style="font-size:0.875rem; color:#1e293b; line-height:1.6; font-style: italic;">{_narrative}</div>
+<div style="font-size:1.1rem; color:#1e293b; line-height:1.6;">{_narrative}</div>
 </div>
 <div style="flex: 1 1 320px; min-width: 280px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0.4rem 0.6rem; text-align: center;">
-<div style="font-size:0.65rem; color:#64748b; font-weight:600; text-transform:uppercase;">Total Cases</div>
+<div style="font-size:0.99rem; color:#64748b; font-weight:600; text-transform:uppercase;">Total Cases</div>
 <div style="font-size:1.15rem; font-weight:800; color:#1e293b;">{_total:,}</div>
 </div>
 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0.4rem 0.6rem; text-align: center;">
-<div style="font-size:0.65rem; color:#64748b; font-weight:600; text-transform:uppercase;">Active Cases</div>
+<div style="font-size:0.99rem; color:#64748b; font-weight:600; text-transform:uppercase;">Active Cases</div>
 <div style="font-size:1.15rem; font-weight:800; color:#2563eb;">{_active:,} <span style="font-size:0.75rem; color:#64748b;">({_active_pct}%)</span></div>
 </div>
 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0.4rem 0.6rem; text-align: center;">
-<div style="font-size:0.65rem; color:#64748b; font-weight:600; text-transform:uppercase;">Dominant Chapter</div>
+<div style="font-size:0.99rem; color:#64748b; font-weight:600; text-transform:uppercase;">Dominant Chapter</div>
 <div style="font-size:1.15rem; font-weight:800; color:#7c3aed;">{_top_ch}</div>
 </div>
 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0.4rem 0.6rem; text-align: center;">
-<div style="font-size:0.65rem; color:#64748b; font-weight:600; text-transform:uppercase;">Avg Match Score</div>
+<div style="font-size:0.99rem; color:#64748b; font-weight:600; text-transform:uppercase;">Avg Match Score</div>
 <div style="font-size:1.15rem; font-weight:800; color:#0f766e;">{_avg_score}%</div>
 </div>
 </div>
@@ -2114,6 +2114,24 @@ def main():
             # 
 
 
+            st.markdown(
+                """
+                <style>
+                div[data-testid="stTabs"] button[data-baseweb="tab"] p {
+                    font-size: 1.15rem !important;
+                    font-weight: 700 !important;
+                    color: #475569;
+                }
+                div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] p {
+                    color: #3b82f6 !important;
+                }
+                div[data-testid="stTabs"] button[data-baseweb="tab"]:hover p {
+                    color: #2563eb !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
 
             panel_dashboard, panel_inspector = st.tabs([
                 " High-Impact Analytics",
@@ -2571,7 +2589,7 @@ def main():
     # -----------------------------------------------------------------
     # WORKSPACE: FORECASTING
     # -----------------------------------------------------------------
-    elif selected_tab == "Forecasting":
+    elif selected_tab == "Predictive Analytics":
         # st.subheader(" Filing Forecast & Risk Intelligence")
         # st.caption("Ensemble ML forecast (Linear, Polynomial, Exp Smoothing, Ridge) with business insights.")
 
@@ -2632,10 +2650,10 @@ def main():
                         <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
                                     border: 1px solid #bae6fd; border-radius: 12px;
                                     padding: 0.9rem 1.25rem; margin-top: 1rem; margin-bottom: 0.5rem;">
-                            <div style="font-size:0.75rem; color:#0369a1; font-weight:700;
+                            <div style="font-size:1.15rem; color:#0369a1; font-weight:700;
                                         letter-spacing:0.07em; text-transform:uppercase;
                                         margin-bottom:0.5rem;"> Key Forecasting Insights</div>
-                            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: #1e293b; line-height: 1.6;">
+                            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.95rem; color: #1e293b; line-height: 1.6;">
                         """ + "".join([f"<li style='margin-bottom:0.4rem;'>{ins}</li>" for ins in fc_result["insights"][:4]]) + """
                             </ul>
                         </div>
@@ -2935,7 +2953,7 @@ def main():
     # -----------------------------------------------------------------
     # WORKSPACE: AI Assistant
     # -----------------------------------------------------------------
-    elif selected_tab == "AI Assistant":
+    elif selected_tab == "Conversational AI":
         render_query_box_tab(schema, st.session_state.actual_schema)
 
 

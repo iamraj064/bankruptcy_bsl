@@ -1657,7 +1657,7 @@ def main():
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": " **Welcome to GenBI Assistant!** "
+                "content": "<span style='font-size: 2.8rem; font-weight: 800;'>Welcome to GenBI Assistant!</span>"
             }
         ]
 
@@ -2083,25 +2083,25 @@ def main():
                     f"""
 <div style="background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); border: 1px solid #c7d2fe; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; justify-content: space-between;">
 <div style="flex: 1.6 1 420px; min-width: 300px;">
-<div style="font-size:0.75rem; color:#6366f1; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; margin-bottom:0.3rem;"> Executive Summery Insights</div>
+<div style="font-size:1.15rem; color:#6366f1; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; margin-bottom:0.3rem;"> Executive Summery Insights</div>
 <div style="font-size:0.82rem; color:#475569; margin-bottom:0.5rem;">{_scope_label}</div>
-<div style="font-size:0.875rem; color:#1e293b; line-height:1.6; font-style: italic;">{_narrative}</div>
+<div style="font-size:1.1rem; color:#1e293b; line-height:1.6;">{_narrative}</div>
 </div>
 <div style="flex: 1 1 320px; min-width: 280px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0.4rem 0.6rem; text-align: center;">
-<div style="font-size:0.65rem; color:#64748b; font-weight:600; text-transform:uppercase;">Total Cases</div>
+<div style="font-size:0.99rem; color:#64748b; font-weight:600; text-transform:uppercase;">Total Cases</div>
 <div style="font-size:1.15rem; font-weight:800; color:#1e293b;">{_total:,}</div>
 </div>
 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0.4rem 0.6rem; text-align: center;">
-<div style="font-size:0.65rem; color:#64748b; font-weight:600; text-transform:uppercase;">Active Cases</div>
+<div style="font-size:0.99rem; color:#64748b; font-weight:600; text-transform:uppercase;">Active Cases</div>
 <div style="font-size:1.15rem; font-weight:800; color:#2563eb;">{_active:,} <span style="font-size:0.75rem; color:#64748b;">({_active_pct}%)</span></div>
 </div>
 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0.4rem 0.6rem; text-align: center;">
-<div style="font-size:0.65rem; color:#64748b; font-weight:600; text-transform:uppercase;">Dominant Chapter</div>
+<div style="font-size:0.99rem; color:#64748b; font-weight:600; text-transform:uppercase;">Dominant Chapter</div>
 <div style="font-size:1.15rem; font-weight:800; color:#7c3aed;">{_top_ch}</div>
 </div>
 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0.4rem 0.6rem; text-align: center;">
-<div style="font-size:0.65rem; color:#64748b; font-weight:600; text-transform:uppercase;">Avg Match Score</div>
+<div style="font-size:0.99rem; color:#64748b; font-weight:600; text-transform:uppercase;">Avg Match Score</div>
 <div style="font-size:1.15rem; font-weight:800; color:#0f766e;">{_avg_score}%</div>
 </div>
 </div>
@@ -2114,6 +2114,24 @@ def main():
             # 
 
 
+            st.markdown(
+                """
+                <style>
+                div[data-testid="stTabs"] button[data-baseweb="tab"] p {
+                    font-size: 1.15rem !important;
+                    font-weight: 700 !important;
+                    color: #475569;
+                }
+                div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] p {
+                    color: #3b82f6 !important;
+                }
+                div[data-testid="stTabs"] button[data-baseweb="tab"]:hover p {
+                    color: #2563eb !important;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
 
             panel_dashboard, panel_inspector = st.tabs([
                 " High-Impact Analytics",

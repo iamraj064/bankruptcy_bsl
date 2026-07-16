@@ -514,36 +514,25 @@ def _generate_dynamic_prompt_suggestions(schema, conversation_memory, last_resul
                 "CRITICAL RELEVANCY RULES (PREVENT IRRELEVANT SUGGESTIONS):\n"
                 "1. The suggestions MUST strictly build upon the active analytical context of the CURRENT USER QUERY and the columns/values shown in the LAST QUERY RESULT SUMMARY (if present).\n"
                 "2. If the current query filtered by a specific value (e.g. a specific state 'NY', client 'VP', chapter '7', status 'Active', match_code 'P2'), all suggestions MUST inherit and apply that exact filter. They must ONLY ask about that specific subset (e.g. 'What is the chapter distribution in NY?', NOT 'What is the chapter distribution in CA?' or 'Compare filings by state'). Do NOT suggest questions about other values of that filtered attribute.\n"
-                "3. If the previous query grouped/aggregated data (e.g., filings by state), suggest drilling down into the top group(s) from that result (e.g. 'What is the status breakdown for NY?').\n"
+                "3. If the previous query grouped/aggregated data (e.g. 'Top states by filings' or 'filings by chapter'), you MUST drill down into the top group(s) from that result. For example, if the result list shows states (e.g., California, Texas, Florida), suggest drilling down into those specific states (e.g. 'Chapter breakdown in California', 'Top clients in Texas'). Do NOT suggest generic or general queries (like 'filings by state') or global queries on unrelated dimensions (like 'Chapter 7 vs 13 filings') without applying the top categories as filters.\n"
                 "4. Do NOT suggest generic or general questions (like total volume or global state rankings) when the active query represents a narrow filtered subset.\n"
                 "5. CRITICAL: Do NOT repeat the same TYPE of follow-up questions over and over. If the user already asked about a certain topic, column, or metric in the conversation history, shift focus to new dimensions (e.g., if they asked about chapters, suggest looking at statuses, timelines, or top clients next).\n\n"
             )
             textual_section = (
                 "A. TEXTUAL QUESTIONS\n"
                 "- Generate EXACTLY 4 questions.\n"
-                "- Make the questions EXTREMELY SIMPLE and short (e.g., 'Top states by filings', 'Chapter breakdown', 'Show active cases').\n"
-                "- Strictly give a maximum of 5 to 7 words each.\n"
-                "- MUST be direct follow-up questions based on the current query/last user question and current query results.\n"
-                "- DIVERSIFY YOUR SUGGESTIONS: Provide a mix of different analytical angles.\n"
+                "- Use SHORT, PUNCHY, SHORTHAND style (4-7 words). Write like search queries or dashboard labels, NOT full English sentences.\n"
+                "  GOOD STYLE: 'Chapter breakdown in top state', 'VP filings in Texas', 'Chapter 7 pro se breakdown', 'High risk cases by client'\n"
+                "  BAD STYLE: 'What is the top client for Active cases?', 'Which state has the most Closed filings?', 'How many Chapter 7 pro se cases are there?'\n"
+                "- Do NOT start with 'What is', 'Which', 'How many', 'How do', 'Identify the', 'Calculate the'. Use direct noun phrases instead.\n"
+                "- Keep the active filters or top categories from the LAST QUERY RESULT (e.g., if the user asked about 'top states' and the result has state 'TX', use 'TX' or 'top state' in the suggested queries: e.g. 'VP filings in TX', 'Chapter breakdown for TX').\n"
+                "- Pivot to a DIFFERENT dimension (chapter, client, status, attorney, risk score, date, etc.) while keeping the top values or filters from the original query.\n"
+                "- NEVER rephrase or restate the original question in any form.\n"
+                "- DIVERSIFY: cover at least 3 different schema columns across the 4 questions.\n"
                 "- Business-focused and insight-driven.\n"
-                "- Questions must request data, metrics, comparisons, rankings, trends, summaries, "
-                "aggregations, filters, or anomalies that follow up logically on the previous query.\n"
-                "- strictly Avoid simple questions like \"What is the total number of bankruptcy cases in the database?\".\n"
-                "- MUST be answerable using the available schema and current dataset.\n"
-                "- MUST reference actual columns, categories, or values from the last query results whenever possible.\n"
-                "- CRITICAL: Do NOT repeat previously asked questions or the exact same type of questions asked in the conversation history.\n"
+                "- MUST be answerable using the available schema.\n"
                 "- Do NOT request charts or visualizations.\n"
-                "- Avoid these words:\n"
-                "  show, display, draw, chart, graph, plot, visualize, dashboard, view.\n"
-                "- Prefer formats such as:\n"
-                "  What is...\n"
-                "  How many...\n"
-                "  Which...\n"
-                "  Identify...\n"
-                "  Calculate...\n"
-                "  Compare...\n"
-                "  List...\n"
-                "  Find...\n\n"
+                "- Avoid these words: show, display, draw, chart, graph, plot, visualize, dashboard, view.\n\n"
             )
             visual_section = (
                 "B. VISUALIZATION SUGGESTIONS\n"
@@ -563,12 +552,14 @@ def _generate_dynamic_prompt_suggestions(schema, conversation_memory, last_resul
                 "  Scatter plot comparing...\n\n"
             )
             context_section = (
-                "CONTEXT AWARENESS:\n"
-                "- If prior results exist, generate deeper investigative follow-ups applying the relevancy rules.\n"
-                "- Use actual values from the latest result summary whenever available.\n"
+                "CONTEXT AWARENESS (CRITICAL DRILL-DOWN RULES):\n"
+                "- Look at the actual data values and categories in the LAST QUERY RESULT SUMMARY.\n"
+                "- If the original query is an aggregation or list by a category (e.g. 'top states by filings', 'cases by chapter', 'filings by client'), the follow-up suggestions MUST drill down into the specific top values from that result (e.g. if the top state is TX, or the top client is VP, use those values as filters in your suggestions like 'Chapter breakdown in TX', 'Filing trend for VP', etc.).\n"
+                "- If the original query already filters by a specific attribute (e.g. state='NY'), all suggestions MUST retain that filter value and pivot to a new dimension (e.g. 'Top clients in NY', 'Chapter distribution in NY', 'Active vs Closed in NY').\n"
+                "- NEVER suggest general, global questions (e.g. 'Chapter 7 vs 13 filings' or 'Closed cases by client') when the user has just asked a specific state, chapter, or client query. Always carry forward the category context or filter value from the results as a filter in the suggested questions.\n"
                 "- Focus on uncovering patterns, concentration risks, regional trends, filing behavior, "
                 "industry impacts, attorney performance, chapter distribution, court activity, "
-                "and temporal changes.\n\n"
+                "and temporal changes within that specific context.\n\n"
             )
 
         prompt = (
@@ -831,6 +822,7 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
             "   - Use ONLY column names that exist in the schema. Never invent column names.\n"
             "   - Expand abbreviations and correct spelling based on schema knowledge.\n"
             "   - Preserve all specific filter values (e.g. state names like 'NY', status names like 'Active', chapter numbers like '7', and match codes like 'P2' or 'M1'). Never generalize specific filter values or drop them.\n"
+            "   - For referential or relative superlatives (e.g. 'top state', 'top client', 'top attorney'), preserve those exact phrases in the normalized query (e.g., 'for the top client in the top state'). Do NOT guess or hallucinate specific names like 'NY' or 'VP' at this stage.\n"
             "   - Keep limit, ordering, and superlative constraints explicitly in the normalized query. For example:\n"
             "     * For singular superlative questions (e.g., 'Which state has the most filings', 'Which chapter has the least cases', 'Which year has the highest filings', 'Which attorney has the highest percent of active cases'), rewrite it to include 'showing only the top 1' or 'showing only the bottom 1'.\n"
             "     * For plural superlative questions (e.g., 'Which states have the highest number of filings', 'top states by cases', 'Which attorneys have the highest number of active cases'), rewrite it to include 'showing only the top 5' (or the limit specified, or 'showing only the top 10'). Do not default to top 1 for plural questions.\n"
@@ -1129,6 +1121,7 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             "  * For standard grouping/distribution queries without a superlative (e.g. 'each year', 'yearly', 'by state', 'by chapter', 'each month', 'each state', 'all chapters', 'all states', 'all status counts'), do NOT set 'limit' (set limit to null) and set 'sort_order' to null.\n"
             "  * If the question asks for BOTH extremes/superlatives (e.g., 'highest and lowest', 'most and least', 'top and bottom', 'maximum and minimum' count/filings), do NOT set 'limit' (set limit to null) and set 'sort_order' to 'desc' and 'sort_by_field' to 'count'. This allows the full sorted list to be returned so the user sees both ends of the spectrum.\n"
             "  * CRITICAL: Do NOT hallucinate or set a default value for 'state', 'chapter', 'date_or_year' (like defaulting to '2024' or current year), or other columns unless that specific filter value is explicitly stated in the user's question. For example, if the question is 'Which state has the most bankruptcy filings?', 'state' must be null, 'group_by_fields' must contain ['state'], 'limit' must be 1, and 'sort_order' must be 'desc'. If the question is 'Which states have the most filings?', 'state' must be null, 'group_by_fields' must contain ['state'], 'limit' must be null, and 'sort_order' must be 'desc'. If the user asks about 'Which year' or 'by year' without a specific year, 'date_or_year' must be null, 'group_by_fields' must contain ['year'], 'limit' must be 1 ONLY if it is a singular superlative (like 'which year has the highest filings'), and 'sort_order' must be 'desc' if superlative. If the user asks for general distribution (e.g., 'each year', 'by year', 'yearly breakdown') or both extremes (e.g. 'highest and lowest', 'most and least'), 'limit' must be null. If the user asks 'Which attorneys have...', 'limit' must be null, not 1 or 5.\n"
+            "  * CRITICAL REFERENTIAL PARSING: If the query contains referential terms like 'top state', 'top client', 'top attorney' without naming a specific state (e.g. TX, CA), client (e.g. VP), or attorney name, you MUST leave those specific entity fields (e.g., state, client_name, attorney_name) as NULL. Do NOT guess or hallucinate specific values (like 'NY' or 'VP') under any circumstances. The SQL Builder will resolve these references dynamically using context or subqueries.\n"
             "- CRITICAL DISAMBIGUATION between 'record_type' and 'status':\n"
             "  * 'New' is ONLY a record_type value (NEVER a status). If user mentions 'new cases', 'new filings', or 'new vs closed', set 'record_type' NOT 'status'.\n"
             "  * 'Closed' appears in BOTH record_type and status. Disambiguate by context:\n"
@@ -1519,6 +1512,106 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             '  "prose_indicator": null,\n'
             '  "has_no_attorney": null\n'
             "}\n\n"
+            "Example Bar chart of active and closed cases by state:\n"
+            "Question: \"Bar chart of active and closed cases by state\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": ["Active", "Closed"],\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["state", "status"],\n'
+            '  "limit": null,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example compare active vs closed cases by year:\n"
+            "Question: \"comapre active vs closed cases by year\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": ["Active", "Closed"],\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["year", "status"],\n'
+            '  "limit": null,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example Filings Trend by Top Client in Top State:\n"
+            "Question: \"Line chart showing filings trend by top client in top state\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": null,\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["year"],\n'
+            '  "limit": null,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example Chapter breakdown in top client:\n"
+            "Question: \"Chapter breakdown in top client\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": null,\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["client_name", "chapter"],\n'
+            '  "limit": 1,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
             "Example Bar chart active and closed status:\n"
             "Question: \"Bar chart showing active and closed case status\"\n"
             "JSON:\n"
@@ -1788,6 +1881,9 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
                 lines.append(f"  User: {entry.get('user_question', '')}")
                 if entry.get("sql_query"):
                     lines.append(f"  SQL: {entry.get('sql_query')}")
+                if entry.get("result_records"):
+                    # Format first 5 rows to let LLM resolve referential context like "top state" or "top client"
+                    lines.append(f"  Results (first 5 rows): {entry.get('result_records')[:5]}")
             conv_context = "RECENT CONVERSATION HISTORY:\n" + "\n".join(lines) + "\n\n"
 
         # Retrieve user preferences from LangGraph InMemoryStore
@@ -1888,9 +1984,36 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "   - USE DATE(date_column, '+30 days') or DATE(date_column, '-1 month') instead of DATE_ADD/DATE_SUB\n"
             "   - USE CAST(JULIANDAY(date_a) - JULIANDAY(date_b) AS INTEGER) instead of DATEDIFF(date_a, date_b)\n"
             "   - DO NOT USE STATISTICAL FUNCTIONS: STDDEV, VARIANCE, CORR, COVAR\n"
-            "24. CRITICAL: NEVER include a WHERE clause filter for a column unless a specific filter value for that column is explicitly set to a non-null value in EXTRACTED ENTITIES. For example, if 'state' is null in EXTRACTED ENTITIES, you MUST NOT filter by state in the WHERE clause (do not use WHERE state = 'TX', WHERE TRIM(state) = 'FL', etc.). Mappings only indicate which columns exist, they do NOT justify adding filters for those columns if the entity value is null.\n\n"
+            "24. CRITICAL: NEVER include a WHERE clause filter for a column unless a specific filter value for that column is explicitly set to a non-null value in EXTRACTED ENTITIES. For example, if 'state' is null in EXTRACTED ENTITIES, you MUST NOT filter by state in the WHERE clause (do not use WHERE state = 'TX', WHERE TRIM(state) = 'FL', etc.). Mappings only indicate which columns exist, they do NOT justify adding filters for those columns if the entity value is null.\n"
+            "25. CONVERSION RATE / CASE CONVERSIONS: When the user asks for a 'conversion rate', 'rate of conversions', 'conversion percentage', or 'chapter conversion rate' (e.g. 'Conversion rate by chapter', 'rate of conversions by chapter'), this refers to cases where the chapter changed from its original filing. You MUST calculate this as: `SUM(CASE WHEN original_chapter != chapter AND original_chapter IS NOT NULL AND original_chapter != '' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*)` AS conversion_rate, group by `original_chapter` (mapped to original_chapter column), and order by original_chapter.\n"
+            "26. RESOLVING REFERENTIAL PHRASES: If the user question mentions 'top state', 'top client', 'top attorney', etc., and this category has a known top value in the ACTIVE RESULT SET SAMPLE DATA or RECENT CONVERSATION HISTORY (e.g., state='TX' because TX is the top state in the previous results), you MUST filter by that specific top value. If there is no previous query result data containing that category, resolve 'top [category]' by using a subquery: e.g. `state = (SELECT state FROM uploaded_data GROUP BY state ORDER BY COUNT(*) DESC LIMIT 1)`.\n\n"
             "FEW-SHOT EXAMPLES:\n"
             "Please Refer to the below examples for Query Generations:\n\n"
+            "Example Conversion Rate:\n"
+            "Question: \"Conversion rate by chapter\"\n"
+            "Entities: {\"group_by_fields\": [\"chapter\"], \"aggregation_type\": \"count\"}\n"
+            "Mappings: {\"group_by_fields\": [\"original_chapter\"]}\n"
+            "Sample SQL: SELECT original_chapter, SUM(CASE WHEN original_chapter != chapter AND original_chapter IS NOT NULL AND original_chapter != '' THEN 1.0 ELSE 0.0 END) * 100.0 / COUNT(*) AS conversion_rate FROM uploaded_data GROUP BY original_chapter ORDER BY original_chapter\n\n"
+            "Example Bar chart of active and closed cases by state (CRITICAL: GROUP BY both state AND status):\n"
+            "Question: \"Bar chart of active and closed cases by state\"\n"
+            "Entities: {\"status\": [\"Active\", \"Closed\"], \"group_by_fields\": [\"state\", \"status\"], \"aggregation_type\": \"count\"}\n"
+            "Mappings: {\"status\": \"status\", \"group_by_fields\": [\"state\", \"status\"]}\n"
+            "Sample SQL: SELECT state, TRIM(status) AS status, COUNT(*) AS count FROM uploaded_data WHERE TRIM(status) IN ('Active', 'Closed') GROUP BY state, status ORDER BY state, status\n\n"
+            "Example compare active vs closed cases by year (CRITICAL: GROUP BY both year AND status):\n"
+            "Question: \"comapre active vs closed cases by year\"\n"
+            "Entities: {\"status\": [\"Active\", \"Closed\"], \"group_by_fields\": [\"year\", \"status\"], \"aggregation_type\": \"count\"}\n"
+            "Mappings: {\"status\": \"status\", \"group_by_fields\": [\"date_filed\", \"status\"]}\n"
+            "Sample SQL: SELECT strftime('%Y', date_filed) AS year, TRIM(status) AS status, COUNT(*) AS count FROM uploaded_data WHERE TRIM(status) IN ('Active', 'Closed') GROUP BY year, status ORDER BY year, status\n\n"
+            "Example Chapter breakdown in top client (Pattern B on client_name — subquery limits client, outer groups by client and chapter):\n"
+            "Question: \"Chapter breakdown in top client\"\n"
+            "Entities: {\"group_by_fields\": [\"client_name\", \"chapter\"], \"limit\": 1, \"sort_order\": \"desc\", \"sort_by_field\": \"count\", \"aggregation_type\": \"count\"}\n"
+            "Mappings: {\"group_by_fields\": [\"client_name\", \"chapter\"], \"limit\": 1}\n"
+            "Sample SQL: SELECT client_name, chapter, COUNT(*) AS count FROM uploaded_data WHERE client_name IN (SELECT client_name FROM uploaded_data GROUP BY client_name ORDER BY COUNT(*) DESC LIMIT 1) GROUP BY client_name, chapter ORDER BY count DESC\n\n"
+            "Example Filings Trend by Top Client in Top State (uses subqueries to find top client and top state dynamically):\n"
+            "Question: \"Line chart showing filings trend by top client in top state\"\n"
+            "Entities: {\"group_by_fields\": [\"year\"], \"aggregation_type\": \"count\"}\n"
+            "Mappings: {\"group_by_fields\": [\"date_filed\"]}\n"
+            "Sample SQL: SELECT strftime('%Y', date_filed) AS year, COUNT(*) AS count FROM uploaded_data WHERE state = (SELECT state FROM uploaded_data GROUP BY state ORDER BY COUNT(*) DESC LIMIT 1) AND client_name = (SELECT client_name FROM uploaded_data GROUP BY client_name ORDER BY COUNT(*) DESC LIMIT 1) GROUP BY year ORDER BY year\n\n"
             "Example top N chapters in state (Pattern A — LIMIT on grouped column):\n"
             "Question: \"Identify the top 3 chapters by count in Texas\"\n"
             "Entities: {\"state\": \"TX\", \"limit\": 3, \"sort_order\": \"desc\", \"sort_by_field\": \"count\", \"group_by_fields\": [\"chapter\"], \"aggregation_type\": \"count\"}\n"
@@ -2372,12 +2495,19 @@ def should_generate_insights(user_query, result_df):
 
 
 def detect_chart_type(user_query):
-    """Detect appropriate visualization type from user query keywords"""
+    """Detect appropriate visualization type from user query keywords.
+
+    Priority order (highest → lowest):
+      donut → pie → scatter → heatmap → histogram → horizontal_bar → area
+      → EXPLICIT bar/compare/vs (checked before line to avoid year/month overriding)
+      → line (only genuine time-series words; NOT bare 'year'/'month')
+      → auto
+    """
     q = user_query.lower()
-    # Most specific matches first
+
     if any(k in q for k in ["donut", "doughnut"]):
         return "donut"
-    if any(k in q for k in ["pie", "ratio", "proportion", "breakdown"]):
+    if any(k in q for k in ["pie", "ratio", "proportion"]):
         return "pie"
     if any(k in q for k in ["scatter", "correlation"]):
         return "scatter"
@@ -2389,10 +2519,25 @@ def detect_chart_type(user_query):
         return "horizontal_bar"
     if any(k in q for k in ["area chart", "area plot", "filled"]):
         return "area"
-    if any(k in q for k in ["line chart", "line plot", "trend line", "over time", "trend", "growth", "year", "month", "yearly", "monthly"]):
-        return "line"
-    if any(k in q for k in ["bar chart", "bar plot", "bar graph", "bar", "column", "compare"]):
+
+    # Explicit bar / comparison keywords take priority over time-grouping words.
+    # 'year'/'month' alone do NOT imply a line chart — they are grouping dimensions.
+    # Support common spelling typos like 'comapre'.
+    if any(k in q for k in [
+        "bar chart", "bar plot", "bar graph", "bar",
+        "column chart", "column graph",
+        "compare", "comapre", "comparison", "vs", "versus",
+    ]):
         return "bar"
+
+    # Line chart: only when the user explicitly asks for a line/trend/time-series.
+    # 'year', 'yearly', 'month', 'monthly' are grouping words — keep them in "auto".
+    if any(k in q for k in [
+        "line chart", "line plot", "trend line",
+        "over time", "trend", "growth",
+    ]):
+        return "line"
+
     return "auto"
 
 
@@ -2592,7 +2737,9 @@ def is_pure_chart_request(user_query):
         'greater', 'less', 'more than', 'fewer than', 'above', 'below', 
         'equal', 'limit', 'top', 'bottom', 'where', 'having', 'filter',
         'sort', 'order by', 'group by', 'count greater', 'count less', 
-        '>', '<', '=', '>=', '<='
+        '>', '<', '=', '>=', '<=', 
+        'compare', 'comparing', 'vs', 'versus', 'between', 
+        'chapter', 'state', 'status', 'client', 'attorney', 'active', 'closed', 'match code', 'record type'
     ]
     
     has_filter = False
@@ -3383,11 +3530,11 @@ def render_query_box_tab(schema, active_schema):
                         df_res = pd.DataFrame(content.get("data", []))
                         render_centered_table(df_res, user_query=msg.get("user_query"))
                     elif content.get("type") == "text":
-                        st.markdown(content.get("message", ""))
+                        st.markdown(content.get("message", ""), unsafe_allow_html=True)
                     else:
                         st.write(content)
                 else:
-                    st.markdown(content)
+                    st.markdown(content, unsafe_allow_html=True)
 
                 if msg["role"] == "assistant":
                     if "dataframe" in msg and msg["dataframe"] is not None:
@@ -3439,10 +3586,18 @@ def render_query_box_tab(schema, active_schema):
 
         if "suggestions_state_key" not in st.session_state or st.session_state.suggestions_state_key != current_state_key or "current_suggestions" not in st.session_state:
             with st.spinner(" Updating suggested prompts..."):
+                # Robustly grab the dataframe from the most recent assistant message in chat history
+                last_df = None
+                if "messages" in st.session_state and st.session_state.messages:
+                    for msg in reversed(st.session_state.messages):
+                        if msg.get("role") == "assistant" and msg.get("dataframe") is not None:
+                            last_df = msg["dataframe"]
+                            break
+                
                 suggestions = _generate_dynamic_prompt_suggestions(
                     schema_to_use,
                     st.session_state.get("conversation_memory"),
-                    last_result_df=st.session_state.get("temp_table_dataframe"),
+                    last_result_df=last_df,
                 )
                 st.session_state.current_suggestions = suggestions
                 st.session_state.suggestions_state_key = current_state_key
