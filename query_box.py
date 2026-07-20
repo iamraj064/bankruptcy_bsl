@@ -902,6 +902,7 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
             "   - Example: 'Corporate transfers in NY' → 'Retrieve records where consumer_type is Corporate and state is NY and status is Converted or conversion_date is not null'\n"
             "   - Example: 'show high risk cases' → 'Retrieve records where match_score is greater than or equal to 98 ordered by match_score descending'\n"
             "   - Example: 'show top 10 high risk cases' → 'Retrieve records where match_score is greater than or equal to 98 ordered by match_score descending showing only the top 10'\n"
+            "   - Example: 'show top 10 cases for TX' → 'Retrieve records where state = TX showing account_number, first_name, last_name, state, date_filed, status, match_score ordered by match_score descending showing only the top 10'\n"
             "   - Example: 'show all chapters filing counts' → 'Show count of cases grouped by chapter column ordered by count descending'\n"
             "   - Example: 'High risk cases yearwise' → 'Show count of cases grouped by year (extracted from date_filed) where match_score is greater than or equal to 98'\n"
             "   - Example: 'Top client filed chapter 7' → 'Retrieve the client_name that has the highest count of records where chapter is 7'\n"
