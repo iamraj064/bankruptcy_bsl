@@ -449,6 +449,7 @@ def format_table(df):
 # DYNAMIC METRICS & CHARTS RETRIEVER FOR DASHBOARD TABS
 # =============================================================================
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_dashboard_metrics(state_filter=None, chapter_filter=None, status_filter=None, 
                         prose_filter=None, asset_filter=None, consumer_type_filter=None, client_filter=None,
                         date_start=None, date_end=None):
@@ -542,6 +543,7 @@ def get_dashboard_metrics(state_filter=None, chapter_filter=None, status_filter=
         return fallback_metrics
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_chart_data(state_filter=None, chapter_filter=None, status_filter=None, 
                   prose_filter=None, asset_filter=None, consumer_type_filter=None, client_filter=None,
                   date_start=None, date_end=None):
@@ -625,6 +627,7 @@ def get_chart_data(state_filter=None, chapter_filter=None, status_filter=None,
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_case_status_distribution(state_filter=None, chapter_filter=None, status_filter=None, 
                                 prose_filter=None, asset_filter=None, consumer_type_filter=None, client_filter=None,
                                 date_start=None, date_end=None):
@@ -715,6 +718,7 @@ def get_open_date_range():
         return None, None
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_monthly_filing_trends(state_filter=None, chapter_filter=None, status_filter=None,
                               prose_filter=None, asset_filter=None, consumer_type_filter=None, client_filter=None,
                               date_start=None, date_end=None):
@@ -805,6 +809,7 @@ def get_monthly_filing_trends(state_filter=None, chapter_filter=None, status_fil
 # BANKRUPTCY DATA INTELLIGENCE MODULES
 # =============================================================================
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_advanced_chapter_conversion_insights(state_filter=None, chapter_filter=None, status_filter=None, 
                                             prose_filter=None, asset_filter=None, consumer_type_filter=None, client_filter=None,
                                             date_start=None, date_end=None):
@@ -915,6 +920,7 @@ def get_advanced_chapter_conversion_insights(state_filter=None, chapter_filter=N
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_legal_representation_insights(state_filter=None, chapter_filter=None, status_filter=None, 
                                     prose_filter=None, asset_filter=None, consumer_type_filter=None, client_filter=None,
                                     date_start=None, date_end=None):
@@ -1014,6 +1020,7 @@ def get_legal_representation_insights(state_filter=None, chapter_filter=None, st
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_client_insights(state_filter=None, chapter_filter=None, status_filter=None, 
                        prose_filter=None, asset_filter=None, consumer_type_filter=None,
                        date_start=None, date_end=None):
@@ -1105,6 +1112,7 @@ def get_client_insights(state_filter=None, chapter_filter=None, status_filter=No
         return pd.DataFrame(), pd.DataFrame()
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_asset_and_geo_insights(state_filter=None, chapter_filter=None, status_filter=None, 
                               prose_filter=None, asset_filter=None, consumer_type_filter=None, client_filter=None,
                               date_start=None, date_end=None):
@@ -1389,9 +1397,10 @@ def get_early_warning_alerts(date_range_start=None, date_range_end=None):
 # ADVANCED DRILL-DOWN & FILTERING FUNCTIONS
 # =============================================================================
 
+@st.cache_data(ttl=300, show_spinner=False)
 def get_filtered_cases(state_filter=None, chapter_filter=None, status_filter=None, 
                        prose_filter=None, asset_filter=None, consumer_type_filter=None, client_filter=None,
-                       date_start=None, date_end=None, limit=1000):
+                       date_start=None, date_end=None, limit=10000):
     """Retrieve filtered case details for drill-down analysis"""
     try:
         table_name = get_db_table_name()
@@ -1627,6 +1636,48 @@ def get_chapter_drilldown_focus(selected_chapter, state_filter=None, status_filt
         return pd.DataFrame(), pd.DataFrame()
 
 
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_sidebar_filter_options():
+    """Load distinct filter option values from the database. Cached for 5 minutes to avoid repeated DB hits on every render."""
+    try:
+        _tname = get_db_table_name()
+        _conn = sqlite3.connect("data.db")
+        try:
+            _states = sorted(pd.read_sql_query(
+                f"SELECT DISTINCT state FROM {_tname} WHERE state IS NOT NULL AND state != '' ORDER BY state",
+                _conn
+            )["state"].tolist())
+        except:
+            _states = []
+        try:
+            _chapters = [int(c) for c in pd.read_sql_query(
+                f"SELECT DISTINCT chapter FROM {_tname} WHERE chapter IS NOT NULL ORDER BY chapter",
+                _conn
+            )["chapter"].tolist() if str(c).isdigit()]
+        except:
+            _chapters = [7, 11, 13]
+        try:
+            _statuses = sorted(pd.read_sql_query(
+                f"SELECT DISTINCT status FROM {_tname} WHERE status IS NOT NULL AND status != '' ORDER BY status",
+                _conn
+            )["status"].tolist())
+        except:
+            _statuses = ["Active", "Closed", "Pending", "Converted", "Dismissed"]
+        try:
+            _clients = sorted(pd.read_sql_query(
+                f"SELECT DISTINCT client_name FROM {_tname} WHERE client_name IS NOT NULL AND client_name != '' ORDER BY client_name",
+                _conn
+            )["client_name"].tolist())
+        except:
+            _clients = []
+        _conn.close()
+        return _states, _chapters, _statuses, _clients
+    except Exception as e:
+        logger.warning(f"get_sidebar_filter_options error: {e}")
+        return [], [7, 11, 13], ["Active", "Closed", "Pending", "Converted", "Dismissed"], []
+
+
 # =============================================================================
 # MAIN LAYOUT
 # =============================================================================
@@ -1725,41 +1776,7 @@ def main():
                 Analytics Filters</div>""",
                 unsafe_allow_html=True
             )
-            _tname = get_db_table_name()
-            _conn = sqlite3.connect("data.db")
-            try:
-                _states_df = pd.read_sql_query(
-                    f"SELECT DISTINCT state FROM {_tname} WHERE state IS NOT NULL AND state != '' ORDER BY state",
-                    _conn
-                )
-                _state_list = sorted(_states_df["state"].tolist())
-            except:
-                _state_list = []
-            try:
-                _chaps_df = pd.read_sql_query(
-                    f"SELECT DISTINCT chapter FROM {_tname} WHERE chapter IS NOT NULL ORDER BY chapter",
-                    _conn
-                )
-                _chapter_list = [int(c) for c in _chaps_df["chapter"].tolist() if str(c).isdigit()]
-            except:
-                _chapter_list = [7, 11, 13]
-            try:
-                _status_df = pd.read_sql_query(
-                    f"SELECT DISTINCT status FROM {_tname} WHERE status IS NOT NULL AND status != '' ORDER BY status",
-                    _conn
-                )
-                _status_list = sorted(_status_df["status"].tolist())
-            except:
-                _status_list = ["Active", "Closed", "Pending", "Converted", "Dismissed"]
-            try:
-                _client_df = pd.read_sql_query(
-                    f"SELECT DISTINCT client_name FROM {_tname} WHERE client_name IS NOT NULL AND client_name != '' ORDER BY client_name",
-                    _conn
-                )
-                _client_list = sorted(_client_df["client_name"].tolist())
-            except:
-                _client_list = []
-            _conn.close()
+            _state_list, _chapter_list, _status_list, _client_list = get_sidebar_filter_options()
 
             sel_state = st.selectbox("State / Territory", ["All States"] + _state_list, key="sb_state")
             state_filter = None if sel_state == "All States" else sel_state
@@ -1790,65 +1807,38 @@ def main():
                 Forecast Filters</div>""",
                 unsafe_allow_html=True
             )
-            _ftname = get_db_table_name()
-            _fconn = sqlite3.connect("data.db")
-            try:
-                _fchaps_df = pd.read_sql_query(
-                    f"SELECT DISTINCT chapter FROM {_ftname} WHERE chapter IS NOT NULL ORDER BY chapter",
-                    _fconn
-                )
-                _fc_chapter_list = [int(c) for c in _fchaps_df["chapter"].tolist() if str(c).isdigit()]
-            except:
-                _fc_chapter_list = [7, 11, 13]
-            try:
-                _fstates_df = pd.read_sql_query(
-                    f"SELECT DISTINCT state FROM {_ftname} WHERE state IS NOT NULL AND state != '' ORDER BY state",
-                    _fconn
-                )
-                _fc_state_list = sorted(_fstates_df["state"].tolist())
-            except:
-                _fc_state_list = []
-            try:
-                _fstatus_df = pd.read_sql_query(
-                    f"SELECT DISTINCT status FROM {_ftname} WHERE status IS NOT NULL AND status != '' ORDER BY status",
-                    _fconn
-                )
-                _fc_status_list = sorted(_fstatus_df["status"].tolist())
-            except:
-                _fc_status_list = ["Active", "Closed", "Pending", "Converted", "Dismissed"]
-            try:
-                _fclient_df = pd.read_sql_query(
-                    f"SELECT DISTINCT client_name FROM {_ftname} WHERE client_name IS NOT NULL AND client_name != '' ORDER BY client_name",
-                    _fconn
-                )
-                _fc_client_list = sorted(_fclient_df["client_name"].tolist())
-            except:
-                _fc_client_list = []
+            _fc_state_list, _fc_chapter_list, _fc_status_list, _fc_client_list = get_sidebar_filter_options()
 
-            # Query for date bounds
+            # Query for date bounds - use cached result from session state
             _min_date_val = datetime.date(2020, 1, 1)
             _max_date_val = datetime.date(2026, 12, 31)
-            try:
-                cur = _fconn.cursor()
-                cur.execute(f"PRAGMA table_info({_ftname})")
-                cols = {r[1] for r in cur.fetchall()}
-                _date_col = "Open_date" if "Open_date" in cols else ("date_filed" if "date_filed" in cols else None)
-                if _date_col:
-                    _df_minmax = pd.read_sql_query(
-                        f"SELECT MIN({_date_col}) as min_d, MAX({_date_col}) as max_d FROM {_ftname} WHERE {_date_col} IS NOT NULL AND {_date_col} != '' AND {_date_col} LIKE '20%'",
-                        _fconn
-                    )
-                    if not _df_minmax.empty:
-                        min_str = _df_minmax["min_d"].iloc[0]
-                        max_str = _df_minmax["max_d"].iloc[0]
-                        if min_str:
-                            _min_date_val = datetime.datetime.strptime(min_str[:10], "%Y-%m-%d").date()
-                        if max_str:
-                            _max_date_val = datetime.datetime.strptime(max_str[:10], "%Y-%m-%d").date()
-            except Exception as e:
-                pass
+            if "_fc_date_bounds" not in st.session_state:
+                try:
+                    _ftname = get_db_table_name()
+                    _fconn = sqlite3.connect("data.db")
+                    cur = _fconn.cursor()
+                    cur.execute(f"PRAGMA table_info({_ftname})")
+                    cols = {r[1] for r in cur.fetchall()}
+                    _date_col = "Open_date" if "Open_date" in cols else ("date_filed" if "date_filed" in cols else None)
+                    if _date_col:
+                        _df_minmax = pd.read_sql_query(
+                            f"SELECT MIN({_date_col}) as min_d, MAX({_date_col}) as max_d FROM {_ftname} WHERE {_date_col} IS NOT NULL AND {_date_col} != '' AND {_date_col} LIKE '20%'",
+                            _fconn
+                        )
+                        if not _df_minmax.empty:
+                            min_str = _df_minmax["min_d"].iloc[0]
+                            max_str = _df_minmax["max_d"].iloc[0]
+                            if min_str:
+                                _min_date_val = datetime.datetime.strptime(min_str[:10], "%Y-%m-%d").date()
+                            if max_str:
+                                _max_date_val = datetime.datetime.strptime(max_str[:10], "%Y-%m-%d").date()
+                    _fconn.close()
+                    st.session_state["_fc_date_bounds"] = (_min_date_val, _max_date_val)
+                except Exception:
+                    pass
+            else:
+                _min_date_val, _max_date_val = st.session_state["_fc_date_bounds"]
 
-            _fconn.close()
 
             _fc_chapter_sel = st.selectbox("Chapter", ["All"] + _fc_chapter_list, key="fc_chapter")
             _fc_chapter_val = None if _fc_chapter_sel == "All" else int(_fc_chapter_sel)
@@ -1957,15 +1947,57 @@ def main():
                 )
                 
                 if st.button("Clear Existing Data", type="primary", use_container_width=True):
+                    # Flush all streamlit session state cache and memory
                     st.session_state.data_in_db = False
                     st.session_state.last_uploaded_file_name = None
                     st.session_state.actual_schema = None
+                    st.session_state.query_cache = {}
+                    st.session_state.conversation_memory = _initialize_conversation_memory()
+                    st.session_state.messages = [
+                        {
+                            "role": "assistant",
+                            "content": "<span style='font-size: 1.3rem; font-weight: 800;'>Welcome to GenBI Assistant!</span>"
+                        }
+                    ]
+                    st.session_state.temp_table_name = None
+                    st.session_state.temp_table_schema = None
+                    st.session_state.temp_table_source_query = None
+                    st.session_state.temp_table_dataframe = None
+                    st.session_state.followup_level = 0
+                    
+                    # Flush databases
                     try:
                         import os
                         if os.path.exists("data.db"):
                             os.remove("data.db")
                     except Exception as e:
                         logger.error(f"Failed to delete data.db: {e}")
+                        # Fallback: Drop all tables from the database if file deletion is blocked by open connections
+                        try:
+                            fallback_conn = sqlite3.connect("data.db")
+                            fallback_cursor = fallback_conn.cursor()
+                            fallback_cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                            tables_to_drop = [r[0] for r in fallback_cursor.fetchall() if not r[0].startswith("sqlite_")]
+                            for t in tables_to_drop:
+                                fallback_cursor.execute(f"DROP TABLE IF EXISTS [{t}]")
+                            fallback_conn.commit()
+                            fallback_conn.close()
+                            logger.info("Successfully dropped all tables from data.db as fallback")
+                        except Exception as ex:
+                            logger.error(f"Failed fallback tables drop: {ex}")
+                            
+                    # Clear litellm prompt cache
+                    try:
+                        import os
+                        if os.path.exists(".litellm_prompt_cache.db"):
+                            cache_conn = sqlite3.connect(".litellm_prompt_cache.db")
+                            cache_conn.execute("DELETE FROM prompt_cache")
+                            cache_conn.commit()
+                            cache_conn.close()
+                            logger.info("Cleared litellm prompt cache database successfully")
+                    except Exception as ce:
+                        logger.error(f"Failed to clear litellm prompt cache: {ce}")
+                        
                     st.rerun()
 
                 with st.expander(" View Data Preview", expanded=True):

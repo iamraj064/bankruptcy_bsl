@@ -803,6 +803,75 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
       - clarification_needed: A short message if the query is unclear (or None)
     """
     try:
+        # ── PROGRAMMATIC INTERCEPT: "top N cases for/in [state]" ─────────────
+        # These queries are raw record retrievals — deterministically handle them
+        # BEFORE the LLM to avoid misclassification or stale cache interference.
+        _STATE_NAME_TO_CODE = {
+            "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
+            "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
+            "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID",
+            "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS",
+            "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
+            "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS",
+            "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV",
+            "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
+            "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK",
+            "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
+            "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT",
+            "vermont": "VT", "virginia": "VA", "washington": "WA", "west virginia": "WV",
+            "wisconsin": "WI", "wyoming": "WY",
+        }
+        _raw_retrieval_pattern = re.compile(
+            r"(?:show(?:\s+me)?|list|get|display|find)?\s*"
+            r"(?:top|first|latest|recent)?\s*(\d+)?\s*"
+            r"(?:cases?|records?|filings?|bankruptcies)\s+"
+            r"(?:for|in|from|of)\s+"
+            r"([A-Za-z0-9][A-Za-z0-9\s]{0,20})",
+            re.IGNORECASE
+        )
+        _match = _raw_retrieval_pattern.match(user_query.strip())
+        if _match:
+            _limit_str = _match.group(1)
+            _location_raw = _match.group(2).strip().rstrip(".,!?")
+            _limit = int(_limit_str) if _limit_str else 10
+            
+            # Check if it's a known state
+            _location_key = _location_raw.lower()
+            _state_code = _STATE_NAME_TO_CODE.get(_location_key)
+            if not _state_code and len(_location_raw) == 2:
+                _maybe_state = _location_raw.upper()
+                if _maybe_state in _STATE_NAME_TO_CODE.values():
+                    _state_code = _maybe_state
+                
+            if _state_code:
+                _norm_q = (
+                    f"Retrieve records where state = {_state_code} showing account_number, "
+                    f"first_name, last_name, state, chapter, status, date_filed, match_score "
+                    f"ordered by match_score descending showing only the top {_limit}"
+                )
+            else:
+                _norm_q = (
+                    f"Retrieve the top {_limit} raw case records for {_location_raw} "
+                    f"showing account_number, first_name, last_name, state, chapter, status, date_filed, match_score "
+                    f"ordered by match_score descending"
+                )
+
+            logger.info(
+                "INTERCEPT: 'top N cases for filter' pattern matched. "
+                "filter=%s limit=%d normalized_query=%r",
+                _location_raw, _limit, _norm_q
+            )
+            return {
+                "normalized_query": _norm_q,
+                "intent": "data_retrieval",
+                "relevant_columns": ["account_number", "first_name", "last_name",
+                                     "state", "chapter", "status", "date_filed", "match_score"],
+                "time_filter": None,
+                "is_answerable": True,
+                "clarification_needed": None,
+            }
+        # ── END INTERCEPT ──────────────────────────────────────────────────────
+
         # Build a compact schema summary for the prompt
         schema_cols = schema.get("columns", []) if schema else []
         table_name = schema.get("table_name", "bankruptcy_data") if schema else "bankruptcy_data"
@@ -839,7 +908,7 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
             f"{preferences_text}"
             "USER QUESTION: \"" + user_query + "\"\n\n"
             "KEY COLUMN MAPPING RULES (use these to resolve ambiguity):\n"
-            "- 'active vs closed', 'case status', 'open/closed/dismissed/discharged' → use the 'status' column (values: Active, Closed, Dismissed, Converted, Pending, Discharged). Note: if the query specifically requests a comparison/breakdown between specific statuses (like 'active vs closed'), only return those specific statuses.\n"
+            "- 'active vs closed', 'case status', 'open/closed/dismissed/discharged' → use the 'status' column (values: Active, Closed, Dismissed, Converted, Pending, Discharged). Note: if the query specifically requests a comparison/breakdown between specific statuses (like 'active vs closed') along with another dimension (e.g. by year, by state), make sure the normalized query explicitly asks for both grouping dimensions (e.g. 'Show count of cases grouped by status AND state/year').\n"
             "- 'active/inactive flag' → use the 'active_status' column\n"
             "- 'new/closed/reopened/update record stage' → use the 'record_type' column (values: New, Closed, Reopened, Update)\n"
             "- CRITICAL DISAMBIGUATION: 'New' is EXCLUSIVELY a record_type value (NEVER a status value). When the user says 'new vs closed', 'closed vs new', 'new cases', always use 'record_type' column. Use 'status' only for legal status values like Active, Pending, Dismissed, Discharged, Converted.\n"
@@ -889,6 +958,8 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
             "   - Example: 'bar chart of filings by state' → 'Show a bar chart of the count grouped by state column'\n"
             "   - Example: 'show debtors in NY' → 'Retrieve records where state = NY showing first_name, last_name, city, state'\n"
             "   - Example: 'active vs closed case breakdown' → 'Show count of cases grouped by status column filtered to show only status is Active or Closed'\n"
+            "   - Example: 'Bar chart comparing active vs closed cases by year' → 'Show a bar chart of the count of cases grouped by status and year (extracted using strftime from date_filed) filtered to show only status is Active or Closed'\n"
+            "   - Example: 'Compare active vs closed by state' → 'Show count of cases grouped by status and state columns filtered to show only status is Active or Closed'\n"
             "   - Example: 'Analyze filings by year and status' → 'Retrieve counts of records grouped by the year (extracted using strftime from date_filed or open_date column) and status column'\n"
             "   - Example: 'Show chapter distribution for each state' → 'Retrieve counts of records grouped by state and chapter columns showing both columns'\n"
             "   - Example: 'P2 matchcode yearwise distribution' → 'Show count of cases grouped by year (extracted from date_filed) where match_code is P2'\n"
@@ -900,6 +971,7 @@ def smart_query_understanding(user_query: str, schema: dict, conversation_memory
             "   - Example: 'Corporate transfers in NY' → 'Retrieve records where consumer_type is Corporate and state is NY and status is Converted or conversion_date is not null'\n"
             "   - Example: 'show high risk cases' → 'Retrieve records where match_score is greater than or equal to 98 ordered by match_score descending'\n"
             "   - Example: 'show top 10 high risk cases' → 'Retrieve records where match_score is greater than or equal to 98 ordered by match_score descending showing only the top 10'\n"
+            "   - Example: 'show top 10 cases for TX' → 'Retrieve records where state = TX showing account_number, first_name, last_name, state, date_filed, status, match_score ordered by match_score descending showing only the top 10'\n"
             "   - Example: 'show all chapters filing counts' → 'Show count of cases grouped by chapter column ordered by count descending'\n"
             "   - Example: 'High risk cases yearwise' → 'Show count of cases grouped by year (extracted from date_filed) where match_score is greater than or equal to 98'\n"
             "   - Example: 'Top client filed chapter 7' → 'Retrieve the client_name that has the highest count of records where chapter is 7'\n"
@@ -1062,7 +1134,7 @@ def intent_classifier(user_question: str, conversation_memory: dict = None, toke
             f"{conv_context}"
             f"USER QUESTION: \"{user_question}\"\n\n"
             "Choose exactly one of the following classification labels:\n"
-            "- 'data_retrieval': requests a list or raw rows of data (e.g., 'show latest 10 filings', 'list attorneys in NY', 'show top 3 risk cases', 'highest score cases'). Note: queries asking for 'top N', 'latest N', 'highest/lowest risk cases', 'highest match scores', or listing cases/records are 'data_retrieval' intent, NOT aggregation.\n"
+            "- 'data_retrieval': requests a list or raw rows of data (e.g., 'show latest 10 filings', 'list attorneys in NY', 'show top 3 risk cases', 'highest score cases'). Note: queries asking for 'top N', 'latest N', 'highest/lowest risk cases', 'highest match scores', or listing cases/records are 'data_retrieval' intent, NOT aggregation. CRITICAL: 'show top N cases for [state/filter]', 'top 10 cases in Texas', 'show me 10 cases for TX' are ALWAYS data_retrieval — they want individual records, NOT a count grouped by state.\n"
             "- 'aggregation': requests counts, sums, averages, grouping, or statistics (e.g., 'total filings', 'cases by state', 'average match score').\n"
             "- 'filter': requests filtering records based on values without aggregation (e.g., 'show only active cases').\n"
             "- 'visualization': explicitly requests a chart, plot, pie, bar, graph, or distribution representation (e.g., 'draw a pie chart of chapter distribution', 'plot filings over time').\n"
@@ -1148,6 +1220,9 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             "- NEVER carry forward filter values (e.g. state, chapter, status, date_or_year, client_name, match_code) from previous SQL queries or previous questions into the current extraction UNLESS the current question explicitly references them by name or pronoun.\n"
             "- If the current question explicitly names a NEW specific value (e.g. 'Texas', 'Chapter 7', 'Active'), extract ONLY that value — do NOT add or merge any values seen in previous SQL queries.\n"
             "- Example: If the previous SQL was 'WHERE state IN (''TX'', ''AZ'')' and the current question is 'Pie chart showing the distribution of bankruptcy chapters in Texas', extract state='TX' ONLY. Do NOT include 'AZ' just because it appeared in a prior SQL query.\n\n"
+            "CRITICAL INTENT RULE (DATA RETRIEVAL):\n"
+            "- IF the INTENT is 'data_retrieval', you MUST set 'group_by_fields' to an empty list `[]` and 'aggregation_type' to `null`.\n"
+            "- When retrieving raw records (e.g. 'top N cases for P2', 'show me latest filings'), we do NOT want grouping, no matter what previous examples show. Do NOT hallucinate `year` or anything else into `group_by_fields` for data retrieval.\n\n"
             "KEY PARSING RULE FOR COLLOQUIAL / INCORRECT ENGLISH:\n"
             "- Suffixes like 'wise' (e.g. yearwise, chapterwise, statewise, matchcodewise) specify fields that must be placed inside the 'group_by_fields' list (e.g. ['year'], ['chapter'], ['state'], ['match_code']).\n"
             "- Abbreviated filters like 'P2 matchcode' should set 'match_code' to 'P2'.\n"
@@ -1157,8 +1232,12 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             "- Phrasings like 'trusty city -Albany' or 'trustee city Albany' should set 'trustee_city' to 'Albany'. Do NOT map city names (e.g., 'Albany') to the 'state' field as 'NY' or any other state abbreviation.\n"
             "- Phrasings like 'trustee name Smith' should set 'trustee_name' to 'Smith'.\n"
             "- Phrasings like 'top 3 risk cases' or 'highest risk cases' should set 'limit' to 3 (or the specified number), 'sort_by_field' to 'risk', and 'sort_order' to 'desc'.\n"
+            "- CRITICAL DISAMBIGUATION — 'top N cases FOR/IN [state or filter]' vs 'top N states by count':\n"
+            "  * 'show top 10 cases for TX', 'top 10 cases in texas', 'show me 10 cases for Florida' → These want INDIVIDUAL RECORDS filtered by state. Set: state='TX', limit=10, aggregation_type=null, group_by_fields=[], sort_order='desc'. Do NOT group by state. Do NOT set aggregation_type to 'count'.\n"
+            "  * 'top 10 states by filings', 'which states have most cases' → These want COUNTS grouped by state. Set: state=null, limit=10, aggregation_type='count', group_by_fields=['state'].\n"
+            "  * The key difference: if the user says 'cases FOR [place]' or 'cases IN [place]' with a specific place name, they want rows — not counts.\n"
             "- SUPERLATIVES ON AGGREGATIONS (e.g. 'most filings', 'least cases', 'highest count', 'lowest filings'):\n"
-            "- COMPARISONS: If the user asks to compare two or more specific categories (e.g. 'Chapter 11 and Chapter 13', 'Active vs Closed'), you MUST extract ALL values into the corresponding field as a list (e.g. chapter: [11, 13], status: ['Active', 'Closed']) AND set group_by_fields to that column (e.g. ['chapter']).\n"
+            "- COMPARISONS: If the user asks to compare two or more specific categories (e.g. 'Chapter 11 and Chapter 13', 'Active vs Closed'), you MUST extract ALL values into the corresponding field as a list (e.g. chapter: [11, 13], status: ['Active', 'Closed']). If another grouping dimension (e.g. state, year) is requested, set BOTH columns in 'group_by_fields' (e.g. ['state', 'status'] or ['year', 'status']). Otherwise, set 'group_by_fields' to that column (e.g. ['status'] or ['chapter']).\n"
             "  * If the question asks for 'most', 'highest', 'maximum', 'top', or 'best' of a count or aggregation:\n"
             "    - If the target noun is singular (e.g., 'Which state has...', 'the top chapter'), set 'limit' to 1 (or the number specified like 'top 3' -> 3).\n"
             "    - If the target noun is plural (e.g., 'Which states have...', 'top chapters', 'highest states'), do NOT set 'limit' unless a specific number is requested (e.g., set to null, unless user says 'top 5').\n"
@@ -1181,9 +1260,17 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             "- 'held cases' → set status to 'Pending' (map 'held' to 'Pending').\n"
             "- 'details of customer XYZ' → set debtor_name to 'XYZ'.\n"
             "- VISUALIZATION WITH MULTIPLE STATUS VALUES: When the user asks for a chart/plot/bar/pie 'showing active and closed', "
-            "'comparing active vs closed', 'active and closed case status', or similar, set status to a list e.g. ['Active', 'Closed'], "
-            "set group_by_fields to ['status'], and set aggregation_type to 'count'. "
-            "NEVER default to a yearwise distribution when explicit status values are mentioned.\n\n"
+            "'comparing active vs closed', 'active and closed case status', or similar:\n"
+            "  * Set status to a list e.g. ['Active', 'Closed'] and set aggregation_type to 'count'.\n"
+            "  * If another grouping dimension (e.g. by year, by state, by chapter) is also requested, set BOTH that dimension and status in 'group_by_fields' (e.g., ['year', 'status'] or ['state', 'status']).\n"
+            "  * Otherwise (if no other grouping dimension is requested), set 'group_by_fields' to ['status'].\n"
+            "- GROUP BY EXPLICIT COLUMNS: If the user question explicitly specifies columns or fields to group by (e.g., 'grouped by status and state', 'grouped by year and status', 'group by state and chapter'), you MUST extract all those fields into the 'group_by_fields' list. For example, 'grouped by status and state columns' -> group_by_fields: ['state', 'status'].\n"
+            "- MULTILEVEL COMPARISONS / BREAKDOWNS: If the user question asks to compare/breakdown multiple categories/values of one column (e.g., active vs closed status, Chapter 7 vs 13, record type New vs Closed) across another grouping dimension (e.g., by year, by state, by chapter), you MUST include BOTH columns in the 'group_by_fields' list. For example:\n"
+            "  * 'compare active vs closed by state' -> group_by_fields: ['state', 'status']\n"
+            "  * 'comparing active vs closed cases by year' -> group_by_fields: ['year', 'status']\n"
+            "  * 'compare Chapter 7 and 13 by state' -> group_by_fields: ['state', 'chapter']\n"
+            "  * 'New vs Closed filings by year' -> group_by_fields: ['year', 'record_type']\n"
+            "  * NEVER default to a yearwise distribution when explicit status values are mentioned unless both status and year are in group_by_fields.\n\n"
             "FEW-SHOT EXAMPLES:\n"
             "Example Attorney Singular Superlative:\n"
             "Question: \"Which attorney has the highest percentage of active cases?\"\n"
@@ -1535,6 +1622,56 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             '  "prose_indicator": null,\n'
             '  "has_no_attorney": null\n'
             "}\n\n"
+            "Example show top 10 cases for TX (RAW RECORDS — not a count):\n"
+            "Question: \"show me top 10 cases for texas\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": null,\n'
+            '  "chapter": null,\n'
+            '  "state": "TX",\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "match_score",\n'
+            '  "aggregation_type": null,\n'
+            '  "group_by_fields": [],\n'
+            '  "limit": 10,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example show top 5 active cases in California (RAW RECORDS — not a count):\n"
+            "Question: \"show top 5 active cases in California\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": "Active",\n'
+            '  "chapter": null,\n'
+            '  "state": "CA",\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "match_score",\n'
+            '  "aggregation_type": null,\n'
+            '  "group_by_fields": [],\n'
+            '  "limit": 5,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
             "Example details of customer XYZ:\n"
             "Question: \"details of customer XYZ\"\n"
             "JSON:\n"
@@ -1605,6 +1742,106 @@ def entity_extractor(user_question: str, intent: str, conversation_memory: dict 
             '  "group_by_fields": ["status"],\n'
             '  "limit": null,\n'
             '  "sort_order": null,\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example Bar chart of active and closed cases by state:\n"
+            "Question: \"Bar chart of active and closed cases by state\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": ["Active", "Closed"],\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["state", "status"],\n'
+            '  "limit": null,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example compare active vs closed cases by year:\n"
+            "Question: \"comapre active vs closed cases by year\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": ["Active", "Closed"],\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["year", "status"],\n'
+            '  "limit": null,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example Compare active vs closed by state (normalized):\n"
+            "Question: \"Show count of cases grouped by status and state columns filtered to show only status is Active or Closed\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": ["Active", "Closed"],\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["state", "status"],\n'
+            '  "limit": null,\n'
+            '  "sort_order": "desc",\n'
+            '  "record_type": null,\n'
+            '  "consumer_type": null,\n'
+            '  "prose_indicator": null,\n'
+            '  "has_no_attorney": null\n'
+            "}\n\n"
+            "Example Compare active vs closed by year (normalized):\n"
+            "Question: \"Show a bar chart of the count of cases grouped by status and year (extracted using strftime from date_filed) filtered to show only status is Active or Closed\"\n"
+            "JSON:\n"
+            "{\n"
+            '  "status": ["Active", "Closed"],\n'
+            '  "chapter": null,\n'
+            '  "state": null,\n'
+            '  "date_or_year": null,\n'
+            '  "attorney_name": null,\n'
+            '  "debtor_name": null,\n'
+            '  "match_code": null,\n'
+            '  "client_name": null,\n'
+            '  "city": null,\n'
+            '  "trustee_name": null,\n'
+            '  "trustee_city": null,\n'
+            '  "sort_by_field": "count",\n'
+            '  "aggregation_type": "count",\n'
+            '  "group_by_fields": ["year", "status"],\n'
+            '  "limit": null,\n'
+            '  "sort_order": "desc",\n'
             '  "record_type": null,\n'
             '  "consumer_type": null,\n'
             '  "prose_indicator": null,\n'
@@ -1895,6 +2132,7 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "3. Date columns are filtered/grouped by year using SQLite strftime, e.g. `strftime('%Y', date_column) = '2024'` or `substr(date_column, 1, 4) = '2024'`.\n"
             "4. If text filtering is done on status or other columns, use `TRIM(column_name)` to handle trailing/leading whitespace in text fields.\n"
             "5. If a distribution/breakdown of X by Y is requested (e.g., 'chapter distribution for each state'), select both columns, group by both columns, and count the total records.\n"
+            "5b. If the user asks for a comparison of multiple values of a column (e.g., 'active vs closed status') by another dimension (e.g. 'by state', 'by year'), this is a multilevel comparison. You MUST select and group by BOTH columns (e.g., SELECT state, TRIM(status) AS status, COUNT(*) AS count ... GROUP BY state, status). If a year/month is involved, group by both year/month and the comparison column (e.g. GROUP BY year, status). Always select the clean values: select TRIM(status) AS status, strftime('%Y', date_filed) AS year, state, etc.\n"
             "6. Keep the query clean: do not end with a semicolon ';', and only use a SELECT statement.\n"
             "7. Use the SAMPLE DATA above to infer exact column value formats (e.g. match_code uses values like 'P1', 'P2', 'M1'; status uses 'Active', 'Closed'; date_filed is in YYYY-MM-DD format).\n"
             "8. When filtering by match_code (e.g. 'P2 matchcode'), ALWAYS add a WHERE clause: WHERE TRIM(match_code) = 'P2'. If match_code is a list (e.g. ['P3', 'M3']), use IN clause: WHERE TRIM(match_code) IN ('P3', 'M3').\n"
@@ -1973,6 +2211,16 @@ def sql_builder(user_question: str, intent: str, extracted_entities: dict, colum
             "Entities: {\"limit\": 3, \"sort_by_field\": \"risk\", \"sort_order\": \"desc\"}\n"
             "Mappings: {\"limit\": 3, \"sort_by_field\": \"match_score\", \"sort_order\": \"desc\"}\n"
             "Sample SQL: SELECT match_score, first_name, last_name, client_name, match_code, status, date_filed FROM uploaded_data ORDER BY match_score DESC LIMIT 3\n\n"
+            "Example top N cases for state (RAW ROWS — NOT a count, no GROUP BY):\n"
+            "Question: \"show me top 10 cases for texas\"\n"
+            "Entities: {\"state\": \"TX\", \"limit\": 10, \"sort_by_field\": \"match_score\", \"sort_order\": \"desc\", \"aggregation_type\": null, \"group_by_fields\": []}\n"
+            "Mappings: {\"state\": \"state\", \"sort_by_field\": \"match_score\"}\n"
+            "Sample SQL: SELECT account_number, first_name, last_name, state, chapter, status, date_filed, match_score FROM uploaded_data WHERE TRIM(state) = 'TX' ORDER BY match_score DESC LIMIT 10\n\n"
+            "Example top N cases for state with status filter (RAW ROWS — NOT a count, no GROUP BY):\n"
+            "Question: \"show top 5 active cases in California\"\n"
+            "Entities: {\"state\": \"CA\", \"status\": \"Active\", \"limit\": 5, \"sort_by_field\": \"match_score\", \"sort_order\": \"desc\", \"aggregation_type\": null, \"group_by_fields\": []}\n"
+            "Mappings: {\"state\": \"state\", \"status\": \"status\", \"sort_by_field\": \"match_score\"}\n"
+            "Sample SQL: SELECT account_number, first_name, last_name, state, chapter, status, date_filed, match_score FROM uploaded_data WHERE TRIM(state) = 'CA' AND TRIM(status) = 'Active' ORDER BY match_score DESC LIMIT 5\n\n"
             "Example 5 (record_type — new vs closed):\n"
             "Question: \"VP closed vs new cases\"\n"
             "Entities: {\"client_name\": \"VP\", \"record_type\": [\"New\", \"Closed\"], \"group_by_fields\": [\"record_type\"], \"aggregation_type\": \"count\"}\n"
@@ -2159,28 +2407,150 @@ def normalize_extracted_entities(entities: dict) -> dict:
             entities["prose_indicator"] = 'Y'
         elif val in ['N', 'NO', 'FALSE', '0']:
             entities["prose_indicator"] = 'N'
-            
+
+    # ── PROGRAMMATIC GUARD: "top N cases FOR/IN [specific state/filter]" ──────
+    # If a SPECIFIC filter value is set (e.g. state='TX', status='Active') and
+    # a LIMIT is also set, but group_by_fields is empty or only contains filter
+    # columns — this is a RAW RECORD retrieval, never an aggregation.
+    # Force aggregation_type=null to prevent GROUP BY / COUNT from being generated.
+    specific_filter_set = any([
+        entities.get("state") and not isinstance(entities.get("state"), list),
+        entities.get("chapter") and not isinstance(entities.get("chapter"), list),
+        entities.get("status") and not isinstance(entities.get("status"), list),
+        entities.get("match_code") and not isinstance(entities.get("match_code"), list),
+        entities.get("client_name"),
+        entities.get("debtor_name"),
+    ])
+    has_limit = entities.get("limit") is not None
+    group_fields = entities.get("group_by_fields") or []
+    # Only override if there's a specific filter + limit AND group_by_fields is empty
+    # (meaning it's a "top N rows matching filter" query, not a "top N groups" query)
+    if specific_filter_set and has_limit and len(group_fields) == 0:
+        if entities.get("aggregation_type") in ("count", "sum", "average"):
+            logger.info(
+                "GUARD: Overriding aggregation_type='%s' to null for specific-filter+limit raw retrieval query. "
+                "state=%s limit=%s group_by=%s",
+                entities.get("aggregation_type"), entities.get("state"),
+                entities.get("limit"), group_fields
+            )
+            entities["aggregation_type"] = None
+    # ── END GUARD ─────────────────────────────────────────────────────────────
+
     return entities
 
 
+
+
+def sql_reflection_repair(
+    user_question: str,
+    failed_sql: str,
+    db_error: str,
+    schema: dict,
+    attempt: int,
+    conversation_memory: dict = None,
+    token_usage: dict = None,
+) -> str:
+    """
+    Stage R: Reflection — LLM analyzes the failed SQL + DB error and produces a repaired query.
+
+    Architecture:
+        [Actor: SQL Builder] --> [Evaluator: Execute] --(DB Error)--> [Reflection: Analyze + Repair] --> [Retry]
+
+    Parameters
+    ----------
+    user_question : str  The original/normalized user question.
+    failed_sql    : str  The SQL that caused the error.
+    db_error      : str  The exact error string returned by SQLite.
+    schema        : dict The active schema dict (column names, types, table name).
+    attempt       : int  Current retry attempt number (1-indexed).
+    token_usage   : dict Mutable dict to accumulate token counts.
+
+    Returns
+    -------
+    str  A repaired SQL query string, or empty string if repair failed.
+    """
+    try:
+        table_name = schema.get("table_name", "uploaded_data")
+        columns_info = "\n".join(
+            f"  - {col['name']} ({col.get('type','TEXT')})"
+            for col in schema.get("columns", [])
+        )
+
+        # Summarise conversation context if available
+        history_block = ""
+        if conversation_memory:
+            prev = conversation_memory.get("previous_queries", [])
+            if prev:
+                last = prev[-1]
+                history_block = (
+                    f"\nPREVIOUS SQL (for context):\n{last.get('sql', '')}\n"
+                    f"PREVIOUS RESULT ROW COUNT: {last.get('row_count', 'unknown')}\n"
+                )
+
+        reflection_prompt = (
+            f"You are an expert SQLite query debugger. Your task is to fix a broken SQL query.\n\n"
+            f"=== ORIGINAL USER QUESTION ===\n{user_question}\n\n"
+            f"=== FAILED SQL (Attempt {attempt}) ===\n{failed_sql}\n\n"
+            f"=== DATABASE ERROR ===\n{db_error}\n\n"
+            f"=== DATABASE TABLE ===\nTable: {table_name}\nColumns:\n{columns_info}\n"
+            f"{history_block}\n"
+            "=== REFLECTION INSTRUCTIONS ===\n"
+            "1. Carefully analyze WHY the SQL failed based on the error message.\n"
+            "2. Common causes: wrong column name, wrong table name, invalid SQLite syntax "
+            "(no DATE_ADD, no STDDEV, no NOW() — use strftime/DATE instead), "
+            "NULL handling issues, UNION ALL column count mismatch, or hallucinated column.\n"
+            "3. Fix ONLY the specific part that caused the error. Keep the rest of the query intact.\n"
+            "4. The database is SQLite — do NOT use MySQL or PostgreSQL specific syntax.\n"
+            "5. Output ONLY a JSON object with a single key `sql` whose value is the corrected SQL:\n"
+            "{ \"sql\": \"SELECT ...\" }\n"
+            "Do not include markdown, comments, or any explanation."
+        )
+
+        response = call_llm_with_cache(reflection_prompt, temperature=0.0)
+        if token_usage is not None:
+            usage = count_token_usage(reflection_prompt, response)
+            for k, v in usage.items():
+                token_usage[k] = token_usage.get(k, 0) + v
+
+        repaired_sql = extract_sql_from_response(response)
+        if repaired_sql:
+            logger.info("Reflection repair (attempt %d) produced SQL: %s", attempt, repaired_sql)
+        else:
+            logger.warning("Reflection repair (attempt %d) returned empty SQL", attempt)
+        return repaired_sql
+
+    except Exception as e:
+        logger.exception("Reflection repair failed on attempt %d: %s", attempt, e)
+        return ""
+
+
 def generate_sql_from_question(user_question, schema, conversation_memory=None, token_usage=None, main_schema=None, temp_table_name=None, temp_table_schema=None):
-    """Refactored pipeline to generate, validate, and execute SQL based on user question"""
+    """Refactored pipeline to generate, validate, and execute SQL based on user question.
+
+    Implements the Reflection technique:
+      1. Actor  — LLM generates SQL (Steps 1-4)
+      2. Evaluator — Execute SQL against SQLite (Step 5)
+      3. Reflection — On DB error, LLM analyzes error + failed SQL and proposes repair (Step R)
+      4. Retry  — Re-execute repaired SQL (loop back to Step 5, max 3 attempts)
+    """
+    MAX_REFLECTION_RETRIES = 3
+
     try:
         logger.info("Executing pipeline for user question: %s", user_question)
-        
+
         # Step 1: Intent Classifier
         intent = intent_classifier(user_question, conversation_memory, token_usage)
         logger.info("Pipeline Step 1: Intent Classifier -> %s", intent)
-        
+
         # Step 2: Entity Extractor
         entities = entity_extractor(user_question, intent, conversation_memory, token_usage)
         entities = normalize_extracted_entities(entities)
         logger.info("Pipeline Step 2: Entity Extractor -> %s", json.dumps(entities))
-        
+
         # Step 3: Column Mapper
         mapping = column_mapper(entities, schema, main_schema, token_usage)
         logger.info("Pipeline Step 3: Column Mapper -> %s", json.dumps(mapping))
-        
+
         # Step 4: SQL Builder
         sql_query = sql_builder(
             user_question, intent, entities, mapping, schema, main_schema, conversation_memory, token_usage,
@@ -2188,32 +2558,88 @@ def generate_sql_from_question(user_question, schema, conversation_memory=None, 
             temp_table_schema=temp_table_schema
         )
         logger.info("Pipeline Step 4: SQL Builder -> %s", sql_query)
-        
-        # Step 5: SQL Validator
+
+        # Step 5: SQL Validator (LLM judge)
         validation_result = sql_validator(sql_query, user_question, schema, main_schema, token_usage)
         logger.info("Pipeline Step 5: SQL Validator -> %s", json.dumps(validation_result))
-        
-        # If repaired_query is provided, use it
+
+        # Apply validator repair if available
         final_query = sql_query
         if not validation_result.get("is_valid") and validation_result.get("repaired_query"):
             final_query = validation_result["repaired_query"]
-            
-        # Step 6: Execute SQLite
+            logger.info("Validator auto-repaired SQL -> %s", final_query)
+
+        # ── Step 6 + Reflection Retry Loop ────────────────────────────────────
+        # Execute the query; on DB failure invoke Reflection and retry up to MAX_REFLECTION_RETRIES.
         result_df = None
-        if final_query:
-            result_df = execute_sqlite(final_query)
-            logger.info("Pipeline Step 6: Execute SQLite -> Success, fetched %d rows", len(result_df) if result_df is not None else 0)
-        else:
-            logger.warning("Pipeline Step 6: Execute SQLite skipped (Empty query)")
-            
+        reflection_attempts = 0
+        current_sql = final_query
+
+        while current_sql:
+            try:
+                cleaned_sql = clean_sql_for_whitespace(current_sql)
+                logger.info("Executing SQLite SQL: %s", cleaned_sql)
+                conn = sqlite3.connect("data.db")
+                result_df = pd.read_sql_query(cleaned_sql, conn)
+                conn.close()
+                logger.info(
+                    "Pipeline Step 6: Execute SQLite -> Success, fetched %d rows (reflection_attempts=%d)",
+                    len(result_df), reflection_attempts
+                )
+                final_query = current_sql  # record the successful SQL
+                break  # ✅ Success — exit retry loop
+
+            except Exception as db_err:
+                db_error_str = str(db_err)
+                reflection_attempts += 1
+                logger.warning(
+                    "Pipeline Step 6: Execute SQLite FAILED (attempt %d/%d) | error=%s | sql=%s",
+                    reflection_attempts, MAX_REFLECTION_RETRIES, db_error_str, current_sql
+                )
+
+                if reflection_attempts > MAX_REFLECTION_RETRIES:
+                    logger.error("Reflection retry limit reached (%d). Returning None.", MAX_REFLECTION_RETRIES)
+                    result_df = None
+                    break
+
+                # ── Stage R: Reflection ────────────────────────────────────────
+                logger.info("Invoking Reflection repair (attempt %d)...", reflection_attempts)
+                repaired_sql = sql_reflection_repair(
+                    user_question=user_question,
+                    failed_sql=current_sql,
+                    db_error=db_error_str,
+                    schema=schema,
+                    attempt=reflection_attempts,
+                    conversation_memory=conversation_memory,
+                    token_usage=token_usage,
+                )
+
+                if not repaired_sql:
+                    logger.error("Reflection returned empty SQL on attempt %d. Aborting.", reflection_attempts)
+                    result_df = None
+                    break
+
+                logger.info(
+                    "Reflection attempt %d repaired SQL -> %s",
+                    reflection_attempts, repaired_sql
+                )
+                current_sql = repaired_sql
+                # Loop back to re-execute the repaired SQL ↑
+        # ── End Reflection Retry Loop ─────────────────────────────────────────
+
+        if final_query is None:
+            final_query = sql_query
+
         return {
             "intent": intent,
             "entities": entities,
             "mapping": mapping,
             "sql_query": final_query,
             "validation_result": validation_result,
-            "result_df": result_df
+            "result_df": result_df,
+            "reflection_attempts": reflection_attempts,
         }
+
     except Exception as e:
         logger.exception("Error executing generate_sql_from_question pipeline: %s", e)
         return {
@@ -2222,7 +2648,8 @@ def generate_sql_from_question(user_question, schema, conversation_memory=None, 
             "mapping": {},
             "sql_query": "",
             "validation_result": {"is_valid": False, "status": "ERROR", "explanation": str(e), "repaired_query": None},
-            "result_df": None
+            "result_df": None,
+            "reflection_attempts": 0,
         }
 
 
@@ -2295,6 +2722,7 @@ VALIDATION RULES:
 4. Check if the query limits the results to only the specified comparison categories if the user asked for a breakdown/comparison between specific categories.
 5. Check if the user's question asks for analysis, counts, or grouping 'by year' or 'yearly'. If so, the query must extract the year using strftime('%Y', date_column) or substr(date_column, 1, 4), name it `year`, include it in the SELECT list, and group by it. If the query fails to group by year when requested, it is INVALID.
 6. Check if the user's question asks for a distribution, breakdown, ratio, or comparison of one column (e.g. chapter) by/for/each another column (e.g. state). If so, the query MUST select and group by BOTH columns.
+6b. If the user's question asks to compare multiple categories/values of one column (e.g., 'active vs closed status') by another dimension (e.g., 'by state', 'by year', 'yearly'), the query MUST select and group by BOTH the category column (e.g. status) and the grouping dimension (e.g. state or year). If the query only selects/groups by one of them, it is INVALID.
 7. Check if the date formats are correct (YYYY-MM-DD) if dates are involved.
 {rule_5}
 9. Do not include ';' at the end of the query
@@ -3195,10 +3623,19 @@ def _handle_user_query(user_query, schema, active_schema):
                     token_usage=generation_token_usage,
                     main_schema=main_db_schema,
                 )
-            
+
             sql_query = pipeline_result["sql_query"]
             validation_result = pipeline_result["validation_result"]
             result_df = pipeline_result["result_df"]
+            reflection_attempts = pipeline_result.get("reflection_attempts", 0)
+
+            # If the Reflection engine was invoked, surface a subtle indicator (no alarm)
+            if reflection_attempts > 0:
+                logger.info("Reflection engine repaired query after %d attempt(s)", reflection_attempts)
+                st.markdown(
+                    f"<span style='font-size:0.78rem;color:#6366f1;'>⚙️ Query auto-corrected after {reflection_attempts} reflection attempt{'s' if reflection_attempts > 1 else ''}.</span>",
+                    unsafe_allow_html=True
+                )
 
             if not sql_query and is_followup and st.session_state.temp_table_dataframe is not None and is_chart_request(user_query):
                 logger.info("Empty SQL generated for chart follow-up query. Re-using active dataset.")
