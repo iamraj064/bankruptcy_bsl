@@ -1,4 +1,5 @@
-.env
+﻿.env
+.venv
 .vscode
 .streamlit
 __pycache__
@@ -10,10 +11,12 @@ __pycache__
 
 # Databases (runtime files)
 data.db
+vl_rag.db
 .langchain_cache.db
 .litellm_prompt_cache.db
 
 # Large/binary files
+data.csv
 *.zip
 *.ipynb
 
