@@ -365,13 +365,30 @@ JSON Output:"""
                     is_attorney_group = False
                     
                 # Disambiguate if multiple groups are True
-                if is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group > 1:
+                explicit_groups = set()
+                for g_name, flags in [
+                    ("state", ["by state", "which state", "top state", "states have the most", "state breakdown", "state distribution", "states breakdown", "states distribution"]),
+                    ("chapter", ["by chapter", "which chapter", "top chapter", "chapters have the most", "chapter breakdown", "chapter distribution", "chapters breakdown", "chapters distribution"]),
+                    ("status", ["by status", "which status", "top status", "statuses have the most", "status breakdown", "status distribution", "statuses breakdown", "statuses distribution"]),
+                    ("client", ["by client", "which client", "top client", "clients have the most", "client breakdown", "client distribution", "clients breakdown", "clients distribution"]),
+                    ("attorney", ["by attorney", "which attorney", "top attorney", "which lawyer", "attorneys handle", "attorney breakdown", "attorney distribution", "attorneys breakdown", "attorneys distribution", "top attorneys"])
+                ]:
+                    if any(f in q_lower for f in flags):
+                        explicit_groups.add(g_name)
+
+                if explicit_groups:
+                    is_state_group = "state" in explicit_groups
+                    is_chapter_group = "chapter" in explicit_groups
+                    is_status_group = "status" in explicit_groups
+                    is_client_group = "client" in explicit_groups
+                    is_attorney_group = "attorney" in explicit_groups
+                elif is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group > 1:
                     for g_name, flags in [
-                        ("state", ["by state", "which state", "top state", "states have the most"]),
-                        ("chapter", ["by chapter", "which chapter", "top chapter", "chapters have the most"]),
-                        ("status", ["by status", "which status", "top status", "statuses have the most"]),
-                        ("client", ["by client", "which client", "top client", "clients have the most"]),
-                        ("attorney", ["by attorney", "which attorney", "top attorney", "which lawyer", "attorneys handle"])
+                        ("state", ["state", "states"]),
+                        ("chapter", ["chapter", "chapters"]),
+                        ("status", ["status", "statuses"]),
+                        ("client", ["client", "clients"]),
+                        ("attorney", ["attorney", "attorneys", "lawyer", "lawyers", "counsel", "counsels"])
                     ]:
                         if any(f in q_lower for f in flags):
                             is_state_group = (g_name == "state")
@@ -477,7 +494,28 @@ JSON Output:"""
                         }]
                 elif filters:
                     where_clauses = [f'"{k}" = \'{v}\'' for k, v in filters.items()]
-                    if is_state_group:
+                    if is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group >= 2:
+                        group_definitions = []
+                        if is_attorney_group:
+                            group_definitions.append(("TRIM(COALESCE(Attorny_First_Name, '') || ' ' || COALESCE(Attorny_lastt_Name, ''))", "Attorney", "TRIM(COALESCE(Attorny_First_Name, '') || ' ' || COALESCE(Attorny_lastt_Name, '')) != ''"))
+                        if is_status_group:
+                            group_definitions.append(("status", "Status", "status IS NOT NULL"))
+                        if is_state_group:
+                            group_definitions.append(("State", "State", "State IS NOT NULL"))
+                        if is_chapter_group:
+                            group_definitions.append(("chapter", "Chapter", "chapter IS NOT NULL"))
+                        if is_client_group:
+                            group_definitions.append(("client", "Client", "client IS NOT NULL"))
+                        
+                        g1_expr, g1_alias, g1_cond = group_definitions[0]
+                        g2_expr, g2_alias, g2_cond = group_definitions[1]
+                        
+                        where_clauses.append(g1_cond)
+                        where_clauses.append(g2_cond)
+                        
+                        sql = f"SELECT {g1_expr} as {g1_alias}, {g2_expr} as {g2_alias}, COUNT(*) as Total_Cases FROM cases WHERE {' AND '.join(where_clauses)} GROUP BY {g1_alias}, {g2_alias} ORDER BY Total_Cases DESC LIMIT 20;"
+                        desc = f"{g1_alias} and {g2_alias} cross-distribution matching filters: {filters}"
+                    elif is_state_group:
                         sql = f"SELECT State, COUNT(*) as Total_Filings FROM cases WHERE {' AND '.join(where_clauses)} GROUP BY State{having_clause} ORDER BY Total_Filings DESC{state_limit_str};"
                         desc = f"Top {limit_val} State-wise distribution matching filters: {filters}{having_desc_suffix}" if limit_val else f"State-wise distribution matching filters: {filters}{having_desc_suffix}"
                     elif is_chapter_group:
@@ -511,6 +549,29 @@ JSON Output:"""
                         limit_num = limit_val if limit_val is not None else 10
                         sql = f"SELECT {select_cols} FROM cases WHERE {' AND '.join(where_clauses)}{order_by_clause} LIMIT {limit_num};"
                         desc = f"Top {limit_num} Lookup cases matching filters: {filters}" if limit_val else f"Lookup cases matching filters: {filters}"
+                    
+                    queries_plan = [{
+                        "description": desc,
+                        "sql": sql
+                    }]
+                elif is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group >= 2:
+                    group_definitions = []
+                    if is_attorney_group:
+                        group_definitions.append(("TRIM(COALESCE(Attorny_First_Name, '') || ' ' || COALESCE(Attorny_lastt_Name, ''))", "Attorney", "TRIM(COALESCE(Attorny_First_Name, '') || ' ' || COALESCE(Attorny_lastt_Name, '')) != ''"))
+                    if is_status_group:
+                        group_definitions.append(("status", "Status", "status IS NOT NULL"))
+                    if is_state_group:
+                        group_definitions.append(("State", "State", "State IS NOT NULL"))
+                    if is_chapter_group:
+                        group_definitions.append(("chapter", "Chapter", "chapter IS NOT NULL"))
+                    if is_client_group:
+                        group_definitions.append(("client", "Client", "client IS NOT NULL"))
+                    
+                    g1_expr, g1_alias, g1_cond = group_definitions[0]
+                    g2_expr, g2_alias, g2_cond = group_definitions[1]
+                    
+                    sql = f"SELECT {g1_expr} as {g1_alias}, {g2_expr} as {g2_alias}, COUNT(*) as Total_Cases FROM cases WHERE {g1_cond} AND {g2_cond} GROUP BY {g1_alias}, {g2_alias} ORDER BY Total_Cases DESC LIMIT 20;"
+                    desc = f"{g1_alias} and {g2_alias} cross-distribution"
                     
                     queries_plan = [{
                         "description": desc,
