@@ -199,6 +199,9 @@ class VectorlessSQLGenerator:
             if state_match:
                 filters["State"] = state_match.group(1)
             
+        if any(w in q_lower for w in ["high risk", "high-risk", "risk cases"]):
+            filters["match_score"] = ">= 98"
+            
         return filters
 
     def generate_sql(self, query: str) -> dict:
@@ -482,7 +485,7 @@ JSON Output:"""
                     else:
                         # Fallback count
                         if filters:
-                            where_clauses = [f'"{k}" = \'{v}\'' for k, v in filters.items()]
+                            where_clauses = [f'"{k}" {v}' if k == "match_score" else f'"{k}" = \'{v}\'' for k, v in filters.items()]
                             sql = f"SELECT COUNT(*) as Total_Cases FROM cases WHERE {' AND '.join(where_clauses)};"
                             desc = f"Total case count matching filters: {filters}"
                         else:
@@ -493,7 +496,7 @@ JSON Output:"""
                             "sql": sql
                         }]
                 elif filters:
-                    where_clauses = [f'"{k}" = \'{v}\'' for k, v in filters.items()]
+                    where_clauses = [f'"{k}" {v}' if k == "match_score" else f'"{k}" = \'{v}\'' for k, v in filters.items()]
                     if is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group >= 2:
                         group_definitions = []
                         if is_attorney_group:
@@ -545,6 +548,8 @@ JSON Output:"""
                         select_cols = "Ac_no as Account_No, case_no as Case_No, First_name as First_Name, Last_name as Last_Name, State, chapter as Chapter, status as Status"
                         if is_trend_query or "date_filed" in q_lower:
                             select_cols += ", date_filed as Date_Filed"
+                        if "match_score" in filters:
+                            select_cols += ", match_score as Match_Score"
                         order_by_clause = " ORDER BY date_filed ASC" if (is_trend_query or "date_filed" in q_lower) else ""
                         limit_num = limit_val if limit_val is not None else 10
                         sql = f"SELECT {select_cols} FROM cases WHERE {' AND '.join(where_clauses)}{order_by_clause} LIMIT {limit_num};"
