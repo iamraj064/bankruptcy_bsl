@@ -85,20 +85,28 @@ class VectorlessRetriever:
             
         return filters
 
-    def clean_fts_query(self, query: str) -> str:
+    def clean_fts_query(self, query: str, filters: dict = None) -> str:
         cleaned = re.sub(r'[^\w\s]', ' ', query)
         words = [w.strip() for w in cleaned.split() if len(w.strip()) > 2]
         stopwords = {
             "the", "and", "for", "with", "what", "where", "which", "who", 
             "how", "can", "you", "show", "find", "list", "tell", "case", 
-            "cases", "details", "information", "all", "about", "get", "has", "highest"
+            "cases", "details", "information", "all", "about", "get", "has", "highest",
+            "most", "least", "top"
         }
-        filtered_words = [w for w in words if w.lower() not in stopwords]
-        if not filtered_words:
-            filtered_words = [w for w in words]
+        
+        # Exclude terms that were already mapped to structured filters (e.g. 'TX', 'Active')
+        exclude_terms = set()
+        if filters:
+            for k, v in filters.items():
+                if isinstance(v, str):
+                    exclude_terms.add(v.lower())
+        
+        filtered_words = [w for w in words if w.lower() not in stopwords and w.lower() not in exclude_terms]
+        
         if not filtered_words:
             return "*"
-        return " OR ".join([f'"{w}"*' for w in filtered_words])
+        return " AND ".join([f'"{w}"*' for w in filtered_words])
 
     def execute_plan(self, plan: dict, top_k: int = config.DEFAULT_TOP_K):
         conn = self.get_connection()
@@ -152,47 +160,45 @@ class VectorlessRetriever:
         filters = self.parse_intent(query)
         records = []
         executed_sql = ""
-        search_mode = "Vectorless Hybrid"
-
-        if "case_no" in filters or "Ac_no" in filters:
-            search_mode = "Direct Structural SQL Match"
-            where_clauses = []
-            params = []
-            if "case_no" in filters:
-                where_clauses.append('case_no = ?')
-                params.append(filters["case_no"])
-            if "Ac_no" in filters:
-                where_clauses.append('Ac_no = ?')
-                params.append(filters["Ac_no"])
-                
-            executed_sql = f'SELECT Ac_no as Account_No, case_no as Case_No, client as Client, First_name as First_Name, Last_name as Last_Name, State, chapter as Chapter, status as Status, Judge_name as Judge, trustee_name as Trustee, Disposition_text as Disposition FROM cases WHERE {" AND ".join(where_clauses)} LIMIT {top_k};'
+        
+        where_clauses = []
+        params = []
+        
+        # Inject all extracted structured filters
+        for col, val in filters.items():
+            where_clauses.append(f"c.{col} = ?")
+            params.append(val)
+            
+        fts_term = self.clean_fts_query(query, filters)
+        if fts_term != "*":
+            where_clauses.append("cases_fts MATCH ?")
+            params.append(fts_term)
+            
+        where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        executed_sql = f'''
+        SELECT c.Ac_no as Account_No, c.case_no as Case_No, c.client as Client, c.First_name as First_Name, c.Last_name as Last_Name, c.State, c.chapter as Chapter, c.status as Status,
+               c.Attorny_First_Name as Attorney_First_Name, c.Attorny_lastt_Name as Attorney_Last_Name, c.trustee_name as Trustee, c.Judge_name as Judge
+        FROM cases c
+        JOIN cases_fts fts ON c.Ac_no = fts.Ac_no
+        {where_sql}
+        ORDER BY fts.rank ASC
+        LIMIT {top_k};
+        '''
+        
+        try:
             cursor.execute(executed_sql, params)
             rows = cursor.fetchall()
             records = [dict(r) for r in rows]
-
-        if not records:
-            search_mode = "SQLite FTS5 Okapi BM25 Ranking"
-            fts_term = self.clean_fts_query(query)
-            executed_sql = f'''
-            SELECT c.Ac_no as Account_No, c.case_no as Case_No, c.client as Client, c.First_name as First_Name, c.Last_name as Last_Name, c.State, c.chapter as Chapter, c.status as Status,
-                   c.Attorny_First_Name as Attorney_First_Name, c.Attorny_lastt_Name as Attorney_Last_Name, c.trustee_name as Trustee, c.Judge_name as Judge
-            FROM cases c
-            JOIN cases_fts fts ON c.Ac_no = fts.Ac_no
-            WHERE cases_fts MATCH ?
-            ORDER BY fts.rank ASC
-            LIMIT {top_k};
-            '''
-            try:
-                cursor.execute(executed_sql, [fts_term])
-                rows = cursor.fetchall()
-                records = [dict(r) for r in rows]
-            except sqlite3.OperationalError:
-                clean_raw = re.sub(r'[^\w\s]', '', query).strip()
-                executed_sql = f'SELECT Ac_no as Account_No, case_no as Case_No, First_name as First_Name, Last_name as Last_Name, State, status as Status FROM cases WHERE Disposition_text LIKE ? OR Judge_name LIKE ? OR trustee_name LIKE ? OR City LIKE ? LIMIT {top_k};'
-                param_like = f"%{clean_raw}%"
-                cursor.execute(executed_sql, [param_like, param_like, param_like, param_like])
-                rows = cursor.fetchall()
-                records = [dict(r) for r in rows]
+            search_mode = "Hybrid Structured + FTS"
+        except sqlite3.OperationalError:
+            clean_raw = re.sub(r'[^\w\s]', '', query).strip()
+            executed_sql = f'SELECT Ac_no as Account_No, case_no as Case_No, First_name as First_Name, Last_name as Last_Name, State, status as Status FROM cases WHERE Disposition_text LIKE ? OR Judge_name LIKE ? OR trustee_name LIKE ? OR City LIKE ? LIMIT {top_k};'
+            param_like = f"%{clean_raw}%"
+            cursor.execute(executed_sql, [param_like, param_like, param_like, param_like])
+            rows = cursor.fetchall()
+            records = [dict(r) for r in rows]
+            search_mode = "Generic LIKE Fallback"
 
         conn.close()
         elapsed_ms = (time.time() - start_time) * 1000
