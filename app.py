@@ -198,6 +198,107 @@ def render_centered_table(df, user_query=None):
 </div>
 """, unsafe_allow_html=True)
 
+def try_render_charts(df, user_query):
+    """
+    Analyzes the DataFrame and renders the most appropriate chart using Plotly.
+    Returns True if a chart was rendered.
+    """
+    try:
+        if df is None or df.empty or len(df.columns) < 2:
+            return False
+            
+        # Check column types
+        numeric_cols = df.select_dtypes(include="number").columns.tolist()
+        if len(numeric_cols) != 1:
+            return False
+            
+        num_col = numeric_cols[0]
+        cat_col = [c for c in df.columns if c != num_col][0]
+        
+        # Case 1: Time series -> Render Line Chart
+        if str(cat_col).lower() in ["year", "month", "date", "date_filed", "year_filed"]:
+            import plotly.express as px
+            # Sort chronologically
+            df_sorted = df.copy()
+            df_sorted[cat_col] = df_sorted[cat_col].astype(str)
+            df_sorted = df_sorted.sort_values(by=cat_col)
+            
+            fig = px.line(
+                df_sorted,
+                x=cat_col,
+                y=num_col,
+                markers=True,
+                color_discrete_sequence=["#1e3a8a"] # Modern dark blue
+            )
+            fig.update_layout(
+                margin=dict(t=15, b=10, l=10, r=10),
+                height=280,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(showgrid=True, gridcolor="#e2e8f0", title=None),
+                yaxis=dict(showgrid=True, gridcolor="#e2e8f0", title=None)
+            )
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            return True
+            
+        # Case 2: Categorical Distribution (<= 12 classes) -> Render Pie/Donut Chart
+        if len(df) <= 12:
+            import plotly.express as px
+            fig = px.pie(
+                df, 
+                names=cat_col, 
+                values=num_col, 
+                hole=0.4, # Donut chart
+                color_discrete_sequence=px.colors.qualitative.Safe
+            )
+            fig.update_layout(
+                margin=dict(t=15, b=10, l=10, r=10),
+                height=280,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                legend=dict(
+                    orientation="h",
+                    yanchor="top",
+                    y=-0.05,
+                    xanchor="center",
+                    x=0.5
+                )
+            )
+            fig.update_traces(
+                textposition="inside",
+                textinfo="percent",
+                hoverinfo="label+value+percent"
+            )
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            return True
+            
+        # Case 3: Categorical Distribution (> 12 classes) -> Render Horizontal Bar Chart
+        if len(df) > 12:
+            import plotly.express as px
+            df_sorted = df.sort_values(by=num_col, ascending=True)
+            fig = px.bar(
+                df_sorted,
+                y=cat_col,
+                x=num_col,
+                orientation='h',
+                color_discrete_sequence=["#2563eb"]
+            )
+            fig.update_layout(
+                margin=dict(t=15, b=10, l=10, r=10),
+                height=300,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(showgrid=True, gridcolor="#e2e8f0", title=None),
+                yaxis=dict(showgrid=False, title=None)
+            )
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            return True
+            
+    except Exception as e:
+        logger.error(f"Error rendering chart: {e}", exc_info=True)
+        
+    return False
+
 def render_datasets_ui(raw_records, user_query):
     if not raw_records:
         return
@@ -216,11 +317,23 @@ def render_datasets_ui(raw_records, user_query):
             with st.container(border=True):
                 st.markdown(f"#### 📊 {desc}")
                 if len(df) >= 2:
-                    col1, col2 = st.columns([1.0, 1.2])
-                    with col1:
-                        render_centered_table(df, user_query=user_query)
-                    with col2:
-                        generate_insights(df, user_query=user_query, show_summary=False)
+                    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+                    has_chart = len(df.columns) == 2 and len(numeric_cols) == 1
+                    
+                    if has_chart:
+                        col1, col2, col3 = st.columns([1.0, 1.0, 1.2])
+                        with col1:
+                            render_centered_table(df, user_query=user_query)
+                        with col2:
+                            try_render_charts(df, user_query=user_query)
+                        with col3:
+                            generate_insights(df, user_query=user_query, show_summary=False)
+                    else:
+                        col1, col2 = st.columns([1.0, 1.2])
+                        with col1:
+                            render_centered_table(df, user_query=user_query)
+                        with col2:
+                            generate_insights(df, user_query=user_query, show_summary=False)
                 else:
                     render_centered_table(df, user_query=user_query)
                 
@@ -229,11 +342,23 @@ def render_datasets_ui(raw_records, user_query):
         df = pd.DataFrame(raw_records)
         with st.container(border=True):
             if len(df) >= 2:
-                col1, col2 = st.columns([1.0, 1.2])
-                with col1:
-                    render_centered_table(df, user_query=user_query)
-                with col2:
-                    generate_insights(df, user_query=user_query, show_summary=False)
+                numeric_cols = df.select_dtypes(include="number").columns.tolist()
+                has_chart = len(df.columns) == 2 and len(numeric_cols) == 1
+                
+                if has_chart:
+                    col1, col2, col3 = st.columns([1.0, 1.0, 1.2])
+                    with col1:
+                        render_centered_table(df, user_query=user_query)
+                    with col2:
+                        try_render_charts(df, user_query=user_query)
+                    with col3:
+                        generate_insights(df, user_query=user_query, show_summary=False)
+                else:
+                    col1, col2 = st.columns([1.0, 1.2])
+                    with col1:
+                        render_centered_table(df, user_query=user_query)
+                    with col2:
+                        generate_insights(df, user_query=user_query, show_summary=False)
             else:
                 render_centered_table(df, user_query=user_query)
 
