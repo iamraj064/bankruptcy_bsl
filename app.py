@@ -5,14 +5,14 @@ import sqlite3
 import pandas as pd
 import sys
 import importlib
-import config
-import logger_config
+from vl_rag import config
+from vl_rag import logger_config
 
 # Force reload vectorless_rag to prevent Streamlit hot-reload module caching
-if "vectorless_rag" in sys.modules:
-    importlib.reload(sys.modules["vectorless_rag"])
+if "vl_rag.vectorless_rag" in sys.modules:
+    importlib.reload(sys.modules["vl_rag.vectorless_rag"])
 
-from vectorless_rag import VectorlessRAGQA, DB_PATH
+from vl_rag import VectorlessRAGQA, DB_PATH
 
 logger = logger_config.setup_logger("chatbot_ui")
 
@@ -303,7 +303,7 @@ def render_datasets_ui(raw_records, user_query):
     if not raw_records:
         return
         
-    from insights_generator import generate_insights
+    from vl_rag import generate_insights
     
     # 1. Multi-dataset check (planned queries plan)
     if isinstance(raw_records, list) and len(raw_records) > 0 and "data" in raw_records[0]:

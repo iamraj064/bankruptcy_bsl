@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-import logger_config
+from . import logger_config
 logger = logger_config.setup_logger("config")
 
 # Model & API Configuration

@@ -4,8 +4,8 @@ import re
 import time
 import json
 import pandas as pd
-import config
-import logger_config
+from . import config
+from . import logger_config
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "vl_rag.db")
 logger = logger_config.setup_logger("vectorless_rag")
@@ -48,7 +48,7 @@ class VectorlessRetriever:
         Uses VectorlessSQLGenerator to plan required SQLite queries with
         value alignment and few-shot templates.
         """
-        from vectorless_sql_generator import VectorlessSQLGenerator
+        from .vectorless_sql_generator import VectorlessSQLGenerator
         generator = VectorlessSQLGenerator(self.db_path)
         return generator.generate_sql(query)
 
@@ -507,7 +507,7 @@ JSON Output:"""
         q_lower = query.lower()
 
         # ── 1. Extract entities from the query ─────────────────────────────
-        from vectorless_sql_generator import VectorlessSQLGenerator
+        from .vectorless_sql_generator import VectorlessSQLGenerator
         generator = VectorlessSQLGenerator(self.retriever.db_path)
         filters = generator.parse_intent(query)
 

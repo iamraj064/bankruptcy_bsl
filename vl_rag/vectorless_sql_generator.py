@@ -1,10 +1,11 @@
 import sqlite3
 import re
 import json
-import config
-import logger_config
+from . import config
+from . import logger_config
+import os
 
-DB_PATH = "vl_rag.db"
+DB_PATH = os.path.join(os.path.dirname(__file__), "vl_rag.db")
 logger = logger_config.setup_logger("sql_generator")
 
 # Schema catalog for query generation

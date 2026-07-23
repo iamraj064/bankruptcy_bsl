@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 import streamlit as st
 from typing import Dict, List, Tuple, Optional
 import logging
-from config import call_llm, call_llm_with_cache
+from .config import call_llm, call_llm_with_cache
 
 logger = logging.getLogger("insights_generator")
 
