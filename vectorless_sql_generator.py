@@ -345,7 +345,7 @@ JSON Output:"""
                 # If LLM failed, build dynamic smart fallback query matching parsed filters
                 filters = self.parse_intent(query)
                 is_count_query = any(kw in q_lower for kw in ["count", "how many", "volume", "total number", "number of"])
-                is_yearwise = any(kw in q_lower for kw in ["year wise", "year-wise", "yearwise", "yearly", "by year", "over years", "trend by year"])
+                is_yearwise = any(kw in q_lower for kw in ["year wise", "year-wise", "yearwise", "yearly", "by year", "over years", "trend by year", "over time", "trend over time", "trends over time"])
                 is_monthwise = any(kw in q_lower for kw in ["month wise", "month-wise", "monthwise", "monthly", "by month", "trend by month"])
                 is_unique = "unique" in q_lower or "distinct" in q_lower
                 
@@ -374,7 +374,9 @@ JSON Output:"""
                     ("chapter", ["by chapter", "which chapter", "top chapter", "chapters have the most", "chapter breakdown", "chapter distribution", "chapters breakdown", "chapters distribution"]),
                     ("status", ["by status", "which status", "top status", "statuses have the most", "status breakdown", "status distribution", "statuses breakdown", "statuses distribution"]),
                     ("client", ["by client", "which client", "top client", "clients have the most", "client breakdown", "client distribution", "clients breakdown", "clients distribution"]),
-                    ("attorney", ["by attorney", "which attorney", "top attorney", "which lawyer", "attorneys handle", "attorney breakdown", "attorney distribution", "attorneys breakdown", "attorneys distribution", "top attorneys"])
+                    ("attorney", ["by attorney", "which attorney", "top attorney", "which lawyer", "attorneys handle", "attorney breakdown", "attorney distribution", "attorneys breakdown", "attorneys distribution", "top attorneys"]),
+                    ("year", ["by year", "year wise", "yearly", "over time", "trend over time", "trends over time", "over years", "trend by year", "trends by year", "year-wise"]),
+                    ("month", ["by month", "month wise", "monthly", "month-wise"])
                 ]:
                     if any(f in q_lower for f in flags):
                         explicit_groups.add(g_name)
@@ -385,13 +387,17 @@ JSON Output:"""
                     is_status_group = "status" in explicit_groups
                     is_client_group = "client" in explicit_groups
                     is_attorney_group = "attorney" in explicit_groups
-                elif is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group > 1:
+                    is_yearwise = "year" in explicit_groups
+                    is_monthwise = "month" in explicit_groups
+                elif is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group + is_yearwise + is_monthwise > 1:
                     for g_name, flags in [
                         ("state", ["state", "states"]),
                         ("chapter", ["chapter", "chapters"]),
                         ("status", ["status", "statuses"]),
                         ("client", ["client", "clients"]),
-                        ("attorney", ["attorney", "attorneys", "lawyer", "lawyers", "counsel", "counsels"])
+                        ("attorney", ["attorney", "attorneys", "lawyer", "lawyers", "counsel", "counsels"]),
+                        ("year", ["year", "years", "yearly"]),
+                        ("month", ["month", "months", "monthly"])
                     ]:
                         if any(f in q_lower for f in flags):
                             is_state_group = (g_name == "state")
@@ -399,6 +405,8 @@ JSON Output:"""
                             is_status_group = (g_name == "status")
                             is_client_group = (g_name == "client")
                             is_attorney_group = (g_name == "attorney")
+                            is_yearwise = (g_name == "year")
+                            is_monthwise = (g_name == "month")
                             break
                 
                 # Check for threshold criteria (HAVING clause)
@@ -497,7 +505,7 @@ JSON Output:"""
                         }]
                 elif filters:
                     where_clauses = [f'"{k}" {v}' if k == "match_score" else f'"{k}" = \'{v}\'' for k, v in filters.items()]
-                    if is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group >= 2:
+                    if is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group + is_yearwise + is_monthwise >= 2:
                         group_definitions = []
                         if is_attorney_group:
                             group_definitions.append(("TRIM(COALESCE(Attorny_First_Name, '') || ' ' || COALESCE(Attorny_lastt_Name, ''))", "Attorney", "TRIM(COALESCE(Attorny_First_Name, '') || ' ' || COALESCE(Attorny_lastt_Name, '')) != ''"))
@@ -509,6 +517,10 @@ JSON Output:"""
                             group_definitions.append(("chapter", "Chapter", "chapter IS NOT NULL"))
                         if is_client_group:
                             group_definitions.append(("client", "Client", "client IS NOT NULL"))
+                        if is_yearwise:
+                            group_definitions.append(("strftime('%Y', date_filed)", "Year", "date_filed IS NOT NULL"))
+                        if is_monthwise:
+                            group_definitions.append(("strftime('%Y-%m', date_filed)", "Month", "date_filed IS NOT NULL"))
                         
                         g1_expr, g1_alias, g1_cond = group_definitions[0]
                         g2_expr, g2_alias, g2_cond = group_definitions[1]
@@ -516,7 +528,15 @@ JSON Output:"""
                         where_clauses.append(g1_cond)
                         where_clauses.append(g2_cond)
                         
-                        sql = f"SELECT {g1_expr} as {g1_alias}, {g2_expr} as {g2_alias}, COUNT(*) as Total_Cases FROM cases WHERE {' AND '.join(where_clauses)} GROUP BY {g1_alias}, {g2_alias} ORDER BY Total_Cases DESC LIMIT 20;"
+                        order_cols = []
+                        if g1_alias in ["Year", "Month"]:
+                            order_cols.append(f"{g1_alias} ASC")
+                        elif g2_alias in ["Year", "Month"]:
+                            order_cols.append(f"{g2_alias} ASC")
+                        order_cols.append("Total_Cases DESC")
+                        order_by_str = ", ".join(order_cols)
+                        
+                        sql = f"SELECT {g1_expr} as {g1_alias}, {g2_expr} as {g2_alias}, COUNT(*) as Total_Cases FROM cases WHERE {' AND '.join(where_clauses)} GROUP BY {g1_alias}, {g2_alias} ORDER BY {order_by_str} LIMIT 20;"
                         desc = f"{g1_alias} and {g2_alias} cross-distribution matching filters: {filters}"
                     elif is_state_group:
                         sql = f"SELECT State, COUNT(*) as Total_Filings FROM cases WHERE {' AND '.join(where_clauses)} GROUP BY State{having_clause} ORDER BY Total_Filings DESC{state_limit_str};"
@@ -559,7 +579,7 @@ JSON Output:"""
                         "description": desc,
                         "sql": sql
                     }]
-                elif is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group >= 2:
+                elif is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group + is_yearwise + is_monthwise >= 2:
                     group_definitions = []
                     if is_attorney_group:
                         group_definitions.append(("TRIM(COALESCE(Attorny_First_Name, '') || ' ' || COALESCE(Attorny_lastt_Name, ''))", "Attorney", "TRIM(COALESCE(Attorny_First_Name, '') || ' ' || COALESCE(Attorny_lastt_Name, '')) != ''"))
@@ -571,11 +591,23 @@ JSON Output:"""
                         group_definitions.append(("chapter", "Chapter", "chapter IS NOT NULL"))
                     if is_client_group:
                         group_definitions.append(("client", "Client", "client IS NOT NULL"))
+                    if is_yearwise:
+                        group_definitions.append(("strftime('%Y', date_filed)", "Year", "date_filed IS NOT NULL"))
+                    if is_monthwise:
+                        group_definitions.append(("strftime('%Y-%m', date_filed)", "Month", "date_filed IS NOT NULL"))
                     
                     g1_expr, g1_alias, g1_cond = group_definitions[0]
                     g2_expr, g2_alias, g2_cond = group_definitions[1]
                     
-                    sql = f"SELECT {g1_expr} as {g1_alias}, {g2_expr} as {g2_alias}, COUNT(*) as Total_Cases FROM cases WHERE {g1_cond} AND {g2_cond} GROUP BY {g1_alias}, {g2_alias} ORDER BY Total_Cases DESC LIMIT 20;"
+                    order_cols = []
+                    if g1_alias in ["Year", "Month"]:
+                        order_cols.append(f"{g1_alias} ASC")
+                    elif g2_alias in ["Year", "Month"]:
+                        order_cols.append(f"{g2_alias} ASC")
+                    order_cols.append("Total_Cases DESC")
+                    order_by_str = ", ".join(order_cols)
+                    
+                    sql = f"SELECT {g1_expr} as {g1_alias}, {g2_expr} as {g2_alias}, COUNT(*) as Total_Cases FROM cases WHERE {g1_cond} AND {g2_cond} GROUP BY {g1_alias}, {g2_alias} ORDER BY {order_by_str} LIMIT 20;"
                     desc = f"{g1_alias} and {g2_alias} cross-distribution"
                     
                     queries_plan = [{

@@ -198,7 +198,7 @@ def render_centered_table(df, user_query=None):
 </div>
 """, unsafe_allow_html=True)
 
-def try_render_charts(df, user_query):
+def try_render_charts(df, user_query, chart_key=None):
     """
     Analyzes the DataFrame and renders the most appropriate chart using Plotly.
     Returns True if a chart was rendered.
@@ -238,7 +238,7 @@ def try_render_charts(df, user_query):
                 xaxis=dict(showgrid=True, gridcolor="#e2e8f0", title=None),
                 yaxis=dict(showgrid=True, gridcolor="#e2e8f0", title=None)
             )
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False}, key=chart_key)
             return True
             
         # Case 2: Categorical Distribution (<= 12 classes) -> Render Pie/Donut Chart
@@ -269,7 +269,7 @@ def try_render_charts(df, user_query):
                 textinfo="percent",
                 hoverinfo="label+value+percent"
             )
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False}, key=chart_key)
             return True
             
         # Case 3: Categorical Distribution (> 12 classes) -> Render Horizontal Bar Chart
@@ -291,7 +291,7 @@ def try_render_charts(df, user_query):
                 xaxis=dict(showgrid=True, gridcolor="#e2e8f0", title=None),
                 yaxis=dict(showgrid=False, title=None)
             )
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False}, key=chart_key)
             return True
             
     except Exception as e:
@@ -320,12 +320,14 @@ def render_datasets_ui(raw_records, user_query):
                     numeric_cols = df.select_dtypes(include="number").columns.tolist()
                     has_chart = len(df.columns) == 2 and len(numeric_cols) == 1
                     
+                    chart_key = f"chart_multi_{idx}_{hash(user_query or 'default')}"
+                    
                     if has_chart:
                         col1, col2, col3 = st.columns([1.0, 1.0, 1.2])
                         with col1:
                             render_centered_table(df, user_query=user_query)
                         with col2:
-                            try_render_charts(df, user_query=user_query)
+                            try_render_charts(df, user_query=user_query, chart_key=chart_key)
                         with col3:
                             generate_insights(df, user_query=user_query, show_summary=False)
                     else:
@@ -345,12 +347,14 @@ def render_datasets_ui(raw_records, user_query):
                 numeric_cols = df.select_dtypes(include="number").columns.tolist()
                 has_chart = len(df.columns) == 2 and len(numeric_cols) == 1
                 
+                chart_key = f"chart_single_{hash(user_query or 'default')}"
+                
                 if has_chart:
                     col1, col2, col3 = st.columns([1.0, 1.0, 1.2])
                     with col1:
                         render_centered_table(df, user_query=user_query)
                     with col2:
-                        try_render_charts(df, user_query=user_query)
+                        try_render_charts(df, user_query=user_query, chart_key=chart_key)
                     with col3:
                         generate_insights(df, user_query=user_query, show_summary=False)
                 else:
