@@ -363,6 +363,23 @@ JSON Output:"""
                     is_status_group = False
                     is_client_group = False
                     is_attorney_group = False
+                    
+                # Disambiguate if multiple groups are True
+                if is_state_group + is_chapter_group + is_status_group + is_client_group + is_attorney_group > 1:
+                    for g_name, flags in [
+                        ("state", ["by state", "which state", "top state", "states have the most"]),
+                        ("chapter", ["by chapter", "which chapter", "top chapter", "chapters have the most"]),
+                        ("status", ["by status", "which status", "top status", "statuses have the most"]),
+                        ("client", ["by client", "which client", "top client", "clients have the most"]),
+                        ("attorney", ["by attorney", "which attorney", "top attorney", "which lawyer", "attorneys handle"])
+                    ]:
+                        if any(f in q_lower for f in flags):
+                            is_state_group = (g_name == "state")
+                            is_chapter_group = (g_name == "chapter")
+                            is_status_group = (g_name == "status")
+                            is_client_group = (g_name == "client")
+                            is_attorney_group = (g_name == "attorney")
+                            break
                 
                 # Check for threshold criteria (HAVING clause)
                 having_clause = ""
