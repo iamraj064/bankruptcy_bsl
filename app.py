@@ -295,7 +295,7 @@ def try_render_charts(df, user_query):
             return True
             
     except Exception as e:
-        logger.error(f"Error rendering chart: {e}", exc_info=True)
+        logger.error(f"Error rendering chart: {e}")
         
     return False
 
