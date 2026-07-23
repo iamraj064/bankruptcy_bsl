@@ -283,6 +283,13 @@ JSON Output:"""
             chapters_found = re.findall(r'\b(?:chapter\s*)?(7|11|13)\b', q_lower)
             chapters_found = list(dict.fromkeys(chapters_found))
             
+            statuses_raw = ["active", "closed", "dismissed", "pending", "converted", "discharged", "reopened"]
+            statuses_found = []
+            for s in statuses_raw:
+                if re.search(r'\b' + s + r'\b', q_lower):
+                    statuses_found.append(s.capitalize())
+            statuses_found = list(dict.fromkeys(statuses_found))
+            
             if ("compare" in q_lower or " vs " in q_lower or "versus" in q_lower) and len(states_found) >= 2:
                 states_str = ", ".join([f"'{s}'" for s in states_found[:2]])
                 queries_plan = [
@@ -313,6 +320,22 @@ JSON Output:"""
                     {
                         "description": f"Filing status comparison for Chapters {', '.join(chapters_found[:2])}",
                         "sql": f"SELECT chapter as Chapter, status as Status, COUNT(*) as Count FROM cases WHERE chapter IN ({chapters_str}) GROUP BY chapter, Status ORDER BY chapter, Count DESC;"
+                    }
+                ]
+            elif ("compare" in q_lower or " vs " in q_lower or "versus" in q_lower) and len(statuses_found) >= 2:
+                statuses_str = ", ".join([f"'{s}'" for s in statuses_found[:2]])
+                queries_plan = [
+                    {
+                        "description": f"Total case count for Statuses {', '.join(statuses_found[:2])}",
+                        "sql": f"SELECT status as Status, COUNT(*) as Total_Cases FROM cases WHERE status IN ({statuses_str}) GROUP BY status;"
+                    },
+                    {
+                        "description": f"Status comparison by State",
+                        "sql": f"SELECT status as Status, State, COUNT(*) as Count FROM cases WHERE status IN ({statuses_str}) GROUP BY status, State ORDER BY status, Count DESC LIMIT 10;"
+                    },
+                    {
+                        "description": f"Status comparison by Chapter",
+                        "sql": f"SELECT status as Status, chapter as Chapter, COUNT(*) as Count FROM cases WHERE status IN ({statuses_str}) GROUP BY status, Chapter ORDER BY status, Count DESC LIMIT 10;"
                     }
                 ]
             else:
